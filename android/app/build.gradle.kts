@@ -13,7 +13,7 @@ if (keystorePropertiesFile.exists()) {
 }
 
 android {
-    namespace = "dev.aivos.openhands"
+    namespace = "com.openhand.aivos"
     // flutter_local_notifications and androidx.core require API 37 or later.
     compileSdk = 37
     ndkVersion = flutter.ndkVersion
@@ -26,7 +26,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "dev.aivos.openhands"
+        applicationId = "com.openhand.aivos"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode

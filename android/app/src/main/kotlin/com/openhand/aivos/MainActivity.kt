@@ -1,4 +1,4 @@
-package dev.aivos.openhands
+package com.openhand.aivos
 
 import io.flutter.embedding.android.FlutterActivity
 
