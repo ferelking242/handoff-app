@@ -52,6 +52,7 @@ class AgentServerClient {
 
   int _lastSeq = -1;
   bool _connected = false;
+  bool _disposed = false;
 
   /// Live events, including replayed ones after a reconnect.
   Stream<ConversationEvent> get events => _events.stream;
@@ -138,9 +139,17 @@ class AgentServerClient {
       onError: (_) => _onDisconnected(),
       cancelOnError: true,
     );
+    // Report the connection as soon as the handshake completes. Waiting for
+    // the first frame would leave the UI showing "offline" on a quiet
+    // conversation, and would break reconnects that have nothing to replay.
+    await channel.ready;
+    if (_disposed || _channel != channel) return;
+    _connected = true;
+    _connection.add(true);
   }
 
   void _onFrame(dynamic raw) {
+    if (_disposed) return;
     if (!_connected) {
       _connected = true;
       _connection.add(true);
@@ -174,10 +183,11 @@ class AgentServerClient {
   }
 
   void _onDisconnected() {
-    _connected = false;
-    _connection.add(false);
     _channel = null;
     _subscription = null;
+    if (_disposed) return;
+    _connected = false;
+    _connection.add(false);
   }
 
   /// Sends a user message and starts a run if the agent is idle.
@@ -209,6 +219,7 @@ class AgentServerClient {
   }
 
   Future<void> dispose() async {
+    _disposed = true;
     await _subscription?.cancel();
     await _channel?.sink.close();
     _channel = null;

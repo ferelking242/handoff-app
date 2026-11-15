@@ -62,17 +62,18 @@ class SessionState {
 class SessionService {
   SessionService({
     EventCache? cache,
-    NotificationService? notifications,
+    AgentNotifier? notifications,
   }) : _cache = cache ?? EventCache(),
        _notifications = notifications ?? NotificationService.instance;
 
   final EventCache _cache;
-  final NotificationService _notifications;
+  final AgentNotifier _notifications;
 
   final _controllers = <String, StreamController<SessionState>>{};
   final _clients = <String, AgentServerClient>{};
   final _states = <String, SessionState>{};
   final _reconnectTimers = <String, Timer>{};
+  final _opened = <String>{};
   bool _appInForeground = true;
 
   /// Current state of every known session.
@@ -115,12 +116,16 @@ class SessionService {
   /// Opens (or reuses) the session for [conversation]: loads the cached
   /// history immediately, then reconciles with the server and connects the
   /// socket. Idempotent, so any screen can call it freely.
+  ///
+  /// The server round-trip only happens the first time a session is opened;
+  /// afterwards the socket keeps the transcript current, which is what stops
+  /// the history from being refetched every time the screen is revisited.
   Future<void> open(CloudConversation conversation) async {
     final id = conversation.id;
     _emit(
       stateOf(id).copyWith(
         title: conversation.title,
-        loadingHistory: true,
+        loadingHistory: !_opened.contains(id),
         clearError: true,
       ),
     );
@@ -166,23 +171,33 @@ class SessionService {
     }
     final activeClient = client;
 
-    try {
-      final page = await activeClient.fetchHistory();
-      _emit(
-        stateOf(id).copyWith(
-          events: page.events,
-          loadingHistory: false,
-          clearError: true,
-        ),
-      );
-      await _cache.save(id, page.events);
-    } catch (error) {
-      if (cached.isEmpty) {
-        _emit(stateOf(id).copyWith(loadingHistory: false, error: '$error'));
+    if (!_opened.contains(id)) {
+      try {
+        final page = await activeClient.fetchHistory();
+        _emit(
+          stateOf(id).copyWith(
+            events: page.events,
+            loadingHistory: false,
+            clearError: true,
+          ),
+        );
+        await _cache.save(id, page.events);
+      } catch (error) {
+        if (cached.isEmpty) {
+          _emit(stateOf(id).copyWith(loadingHistory: false, error: '$error'));
+        }
       }
+      _opened.add(id);
     }
 
-    await activeClient.connect();
+    try {
+      await activeClient.connect();
+    } catch (error) {
+      // The socket is what keeps the transcript live, but a failure here must
+      // not blow up the caller: the connection listener schedules a reconnect
+      // and the cached transcript is already on screen.
+      _emit(stateOf(id).copyWith(error: 'Could not reach the sandbox: $error'));
+    }
     await _refreshAgentState(id, activeClient);
   }
 
@@ -212,6 +227,9 @@ class SessionService {
 
   void _onEvent(String conversationId, ConversationEvent event) {
     final current = stateOf(conversationId);
+    // A reconnect can replay the tail we already have; drop anything we have
+    // already shown so the transcript never doubles up.
+    if (current.events.any((existing) => existing.id == event.id)) return;
     final events = [...current.events, event];
     final nextState = _stateFromEvent(current, event);
     final unread = _appInForeground ? current.unreadCount : current.unreadCount + 1;
@@ -316,6 +334,7 @@ class SessionService {
     await _clients.remove(conversationId)?.dispose();
     await _controllers.remove(conversationId)?.close();
     _states.remove(conversationId);
+    _opened.remove(conversationId);
   }
 
   Future<void> disposeAll() async {
@@ -332,5 +351,6 @@ class SessionService {
     }
     _controllers.clear();
     _states.clear();
+    _opened.clear();
   }
 }

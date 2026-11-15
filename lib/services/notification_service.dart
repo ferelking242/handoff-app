@@ -1,11 +1,21 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+/// Posts user-visible alerts. The seam exists so the session logic can be
+/// exercised in tests without the native notifications plugin.
+abstract class AgentNotifier {
+  Future<void> showAgentState({
+    required String conversationId,
+    required String title,
+    required String body,
+  });
+}
+
 /// Native notifications for agent state changes.
 ///
 /// The Canvas only plays a sound, and only when the user enabled it, so a
 /// backgrounded agent finishing is silent. This posts a real system
 /// notification the OS shows even when the app is not in the foreground.
-class NotificationService {
+class NotificationService implements AgentNotifier {
   NotificationService._();
 
   static final NotificationService instance = NotificationService._();
@@ -34,6 +44,7 @@ class NotificationService {
   /// Posts (or updates) the notification for one conversation. The id is
   /// derived from the conversation id so a new state replaces the old one
   /// instead of stacking duplicates.
+  @override
   Future<void> showAgentState({
     required String conversationId,
     required String title,
