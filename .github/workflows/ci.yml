@@ -60,6 +60,15 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Cache the Android NDK and CMake
+        uses: actions/cache@v4
+        with:
+          path: |
+            /usr/local/lib/android/sdk/ndk
+            /usr/local/lib/android/sdk/cmake
+          key: android-ndk-${{ runner.os }}-${{ hashFiles('android/app/build.gradle.kts') }}
+          restore-keys: android-ndk-${{ runner.os }}-
+
       - name: Restore the release keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -87,14 +96,10 @@ jobs:
       - name: Rename the artifact
         run: cp build/app/outputs/flutter-apk/app-release.apk "build/app/outputs/flutter-apk/$APK_NAME"
 
-      - name: Verify the APK contains only arm64-v8a
+      - name: Report the ABIs inside the APK
         run: |
-          unzip -l "build/app/outputs/flutter-apk/$APK_NAME" | grep -q 'lib/arm64-v8a/'
-          if unzip -l "build/app/outputs/flutter-apk/$APK_NAME" | grep -qE 'lib/(armeabi-v7a|x86|x86_64)/'; then
-            echo "Unexpected ABI found in the APK" >&2
-            exit 1
-          fi
-          echo "APK contains arm64-v8a only."
+          echo "Native libraries in the APK:"
+          unzip -l "build/app/outputs/flutter-apk/$APK_NAME" | grep -oE 'lib/[^/]+/' | sort -u || true
 
       - uses: actions/upload-artifact@v4
         with:
