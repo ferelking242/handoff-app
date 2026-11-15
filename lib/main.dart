@@ -2,23 +2,25 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/app_config.dart';
+import 'core/icon_fonts/app_icons.dart';
+import 'core/theme/app_theme.dart';
 import 'providers/app_providers.dart';
-import 'screens/conversations_screen.dart';
+import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const ProviderScope(child: AivosApp()));
+  runApp(const ProviderScope(child: HandoffApp()));
 }
 
-class AivosApp extends ConsumerStatefulWidget {
-  const AivosApp({super.key});
+class HandoffApp extends ConsumerStatefulWidget {
+  const HandoffApp({super.key});
 
   @override
-  ConsumerState<AivosApp> createState() => _AivosAppState();
+  ConsumerState<HandoffApp> createState() => _HandoffAppState();
 }
 
-class _AivosAppState extends ConsumerState<AivosApp>
+class _HandoffAppState extends ConsumerState<HandoffApp>
     with WidgetsBindingObserver {
   bool _restoring = true;
 
@@ -31,6 +33,8 @@ class _AivosAppState extends ConsumerState<AivosApp>
 
   Future<void> _restore() async {
     await ref.read(notificationInitProvider.future);
+    await ref.read(themeModeProvider.notifier).restore();
+    await ref.read(hiddenConversationsProvider.notifier).restore();
     await ref.read(authProvider.notifier).restore();
     if (mounted) setState(() => _restoring = false);
   }
@@ -52,27 +56,52 @@ class _AivosAppState extends ConsumerState<AivosApp>
   @override
   Widget build(BuildContext context) {
     final token = ref.watch(authProvider);
-    final theme = ThemeData(
-      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF6C4CF1)),
-      useMaterial3: true,
-    );
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
       title: AppConfig.appName,
       debugShowCheckedModeBanner: false,
-      theme: theme,
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF6C4CF1),
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: themeMode,
       home: _restoring
-          ? const Scaffold(body: Center(child: CircularProgressIndicator()))
+          ? const _Splash()
           : token == null
           ? const LoginScreen()
-          : const ConversationsScreen(),
+          : const HomeScreen(),
+    );
+  }
+}
+
+class _Splash extends StatelessWidget {
+  const _Splash();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: const BoxDecoration(
+                gradient: AppColors.accentGradient,
+                shape: BoxShape.circle,
+              ),
+              alignment: Alignment.center,
+              child: const Icon(AppIcons.flash, size: 28, color: Colors.white),
+            ),
+            const SizedBox(height: 22),
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.2),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

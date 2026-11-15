@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import '../config/app_config.dart';
 import '../models/agent_state.dart';
 import '../models/conversation.dart';
 import '../models/conversation_event.dart';
@@ -7,15 +8,38 @@ import 'agent_server_client.dart';
 import 'event_cache.dart';
 import 'notification_service.dart';
 
+/// A message the user sent that has not been accepted by the server yet.
+///
+/// It is shown immediately as a queued bubble so the composer never blocks and
+/// a flaky connection never loses what was typed.
+class PendingMessage {
+  const PendingMessage({
+    required this.id,
+    required this.text,
+    this.status = PendingStatus.queued,
+  });
+
+  final String id;
+  final String text;
+  final PendingStatus status;
+
+  PendingMessage copyWith({PendingStatus? status}) =>
+      PendingMessage(id: id, text: text, status: status ?? this.status);
+}
+
+enum PendingStatus { queued, sending, failed }
+
 /// The live state of one conversation, shared by every screen that shows it.
 class SessionState {
   const SessionState({
     required this.conversationId,
     this.title = 'Conversation',
     this.events = const [],
+    this.pending = const [],
     this.agentState = AgentState.unknown,
     this.connected = false,
     this.loadingHistory = true,
+    this.hasOlderHistory = true,
     this.error,
     this.unreadCount = 0,
   });
@@ -23,18 +47,32 @@ class SessionState {
   final String conversationId;
   final String title;
   final List<ConversationEvent> events;
+
+  /// Messages typed locally and not yet acknowledged by the server.
+  final List<PendingMessage> pending;
+
   final AgentState agentState;
   final bool connected;
   final bool loadingHistory;
+
+  /// Whether the server is believed to hold events older than [events].
+  final bool hasOlderHistory;
+
   final String? error;
   final int unreadCount;
+
+  bool get isBusy =>
+      agentState == AgentState.running ||
+      pending.any((m) => m.status != PendingStatus.failed);
 
   SessionState copyWith({
     String? title,
     List<ConversationEvent>? events,
+    List<PendingMessage>? pending,
     AgentState? agentState,
     bool? connected,
     bool? loadingHistory,
+    bool? hasOlderHistory,
     String? error,
     bool clearError = false,
     int? unreadCount,
@@ -43,9 +81,11 @@ class SessionState {
       conversationId: conversationId,
       title: title ?? this.title,
       events: events ?? this.events,
+      pending: pending ?? this.pending,
       agentState: agentState ?? this.agentState,
       connected: connected ?? this.connected,
       loadingHistory: loadingHistory ?? this.loadingHistory,
+      hasOlderHistory: hasOlderHistory ?? this.hasOlderHistory,
       error: clearError ? null : (error ?? this.error),
       unreadCount: unreadCount ?? this.unreadCount,
     );
@@ -60,11 +100,9 @@ class SessionState {
 /// a long-lived service that no screen owns: navigating away, or putting the
 /// app in the background, leaves the socket connected and events flowing.
 class SessionService {
-  SessionService({
-    EventCache? cache,
-    AgentNotifier? notifications,
-  }) : _cache = cache ?? EventCache(),
-       _notifications = notifications ?? NotificationService.instance;
+  SessionService({EventCache? cache, AgentNotifier? notifications})
+    : _cache = cache ?? EventCache(),
+      _notifications = notifications ?? NotificationService.instance;
 
   final EventCache _cache;
   final AgentNotifier _notifications;
@@ -73,20 +111,22 @@ class SessionService {
   final _clients = <String, AgentServerClient>{};
   final _states = <String, SessionState>{};
   final _reconnectTimers = <String, Timer>{};
-  final _opened = <String>{};
+  final _cacheTimers = <String, Timer>{};
+
+  /// Conversations whose transcript is already known locally, so the history
+  /// endpoint must never be called for them again.
+  final _historyKnown = <String>{};
+
   bool _appInForeground = true;
 
   /// Current state of every known session.
   Map<String, SessionState> get states => Map.unmodifiable(_states);
 
-  Stream<SessionState> watch(String conversationId) {
-    final controller = _controller(conversationId);
-    return controller.stream;
-  }
+  Stream<SessionState> watch(String conversationId) =>
+      _controller(conversationId).stream;
 
   SessionState stateOf(String conversationId) =>
-      _states[conversationId] ??
-      SessionState(conversationId: conversationId);
+      _states[conversationId] ?? SessionState(conversationId: conversationId);
 
   StreamController<SessionState> _controller(String conversationId) {
     return _controllers.putIfAbsent(conversationId, () {
@@ -113,26 +153,34 @@ class SessionService {
     _appInForeground = foreground;
   }
 
-  /// Opens (or reuses) the session for [conversation]: loads the cached
-  /// history immediately, then reconciles with the server and connects the
-  /// socket. Idempotent, so any screen can call it freely.
+  /// Opens (or reuses) the session for [conversation].
   ///
-  /// The server round-trip only happens the first time a session is opened;
-  /// afterwards the socket keeps the transcript current, which is what stops
-  /// the history from being refetched every time the screen is revisited.
+  /// The transcript is read from disk first and painted immediately. The
+  /// history endpoint is only ever called when there is no local copy: once a
+  /// conversation has been fetched (in this run or a previous one) its history
+  /// is never requested again, and the socket is resumed from the last known
+  /// sequence number instead.
   Future<void> open(CloudConversation conversation) async {
     final id = conversation.id;
     _emit(
       stateOf(id).copyWith(
         title: conversation.title,
-        loadingHistory: !_opened.contains(id),
+        loadingHistory: !_historyKnown.contains(id),
         clearError: true,
       ),
     );
 
     final cached = await _cache.load(id);
     if (cached.isNotEmpty) {
-      _emit(stateOf(id).copyWith(events: cached, loadingHistory: false));
+      _emit(
+        stateOf(id).copyWith(
+          events: cached,
+          loadingHistory: false,
+          hasOlderHistory: cached.length >= AppConfig.historyPageSize,
+        ),
+      );
+      // A local transcript is authoritative: never ask the server for it.
+      _historyKnown.add(id);
     }
 
     final baseUrl = conversation.agentServerBaseUrl;
@@ -163,6 +211,7 @@ class SessionService {
         _emit(stateOf(id).copyWith(connected: connected));
         if (connected) {
           _reconnectTimers.remove(id)?.cancel();
+          unawaited(_flushPending(id, created));
         } else {
           _scheduleReconnect(id, created);
         }
@@ -171,34 +220,33 @@ class SessionService {
     }
     final activeClient = client;
 
-    if (!_opened.contains(id)) {
+    if (!_historyKnown.contains(id)) {
       try {
         final page = await activeClient.fetchHistory();
         _emit(
           stateOf(id).copyWith(
             events: page.events,
             loadingHistory: false,
+            hasOlderHistory: page.hasMore,
             clearError: true,
           ),
         );
         await _cache.save(id, page.events);
+        _historyKnown.add(id);
       } catch (error) {
         if (cached.isEmpty) {
           _emit(stateOf(id).copyWith(loadingHistory: false, error: '$error'));
         }
       }
-      _opened.add(id);
     }
 
     try {
       await activeClient.connect();
     } catch (error) {
-      // The socket is what keeps the transcript live, but a failure here must
-      // not blow up the caller: the connection listener schedules a reconnect
-      // and the cached transcript is already on screen.
       _emit(stateOf(id).copyWith(error: 'Could not reach the sandbox: $error'));
     }
     await _refreshAgentState(id, activeClient);
+    unawaited(_flushPending(id, activeClient));
   }
 
   /// Reopens a dropped socket with a bounded backoff. The cursor is the last
@@ -209,9 +257,7 @@ class SessionService {
     var attempt = 0;
     void schedule() {
       attempt++;
-      final delay = Duration(
-        seconds: (2 * attempt).clamp(2, 30),
-      );
+      final delay = Duration(seconds: (2 * attempt).clamp(2, 30));
       _reconnectTimers[conversationId] = Timer(delay, () async {
         _reconnectTimers.remove(conversationId);
         if (!_clients.containsKey(conversationId)) return;
@@ -232,9 +278,17 @@ class SessionService {
     if (current.events.any((existing) => existing.id == event.id)) return;
     final events = [...current.events, event];
     final nextState = _stateFromEvent(current, event);
-    final unread = _appInForeground ? current.unreadCount : current.unreadCount + 1;
-    _emit(nextState.copyWith(events: events, unreadCount: unread));
-    unawaited(_cache.save(conversationId, events));
+    // A real event from the user means the queued copy was accepted.
+    final pending = event.isUserMessage
+        ? current.pending.where((m) => m.text != event.text).toList()
+        : current.pending;
+    final unread = _appInForeground
+        ? current.unreadCount
+        : current.unreadCount + 1;
+    _emit(
+      nextState.copyWith(events: events, pending: pending, unreadCount: unread),
+    );
+    _persist(conversationId, events);
     _maybeNotify(conversationId, current.agentState, nextState.agentState);
   }
 
@@ -265,7 +319,9 @@ class SessionService {
       final record = await client.fetchConversation();
       final status = record['execution_status'] as String?;
       _emit(
-        stateOf(conversationId).copyWith(agentState: AgentState.fromStatus(status)),
+        stateOf(
+          conversationId,
+        ).copyWith(agentState: AgentState.fromStatus(status)),
       );
     } catch (_) {
       // Non-fatal: the socket will keep the state fresh.
@@ -299,42 +355,151 @@ class SessionService {
     );
   }
 
+  /// Queues [text] and sends it. The bubble appears instantly; if the socket
+  /// is down the message stays queued and goes out as soon as it is back.
   Future<void> sendMessage(String conversationId, String text) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) return;
+    final current = stateOf(conversationId);
+    final message = PendingMessage(
+      id: 'local-${DateTime.now().microsecondsSinceEpoch}',
+      text: trimmed,
+    );
+    _emit(
+      current.copyWith(
+        pending: [...current.pending, message],
+        agentState: AgentState.running,
+        clearError: true,
+      ),
+    );
     final client = _clients[conversationId];
-    if (client == null) throw StateError('Session is not open.');
-    _emit(stateOf(conversationId).copyWith(agentState: AgentState.running));
-    await client.sendMessage(text);
+    if (client != null) await _flushPending(conversationId, client);
+  }
+
+  /// Retries everything still queued, used by the "Retry" affordance on a
+  /// failed bubble.
+  Future<void> retryPending(String conversationId) async {
+    final client = _clients[conversationId];
+    if (client == null) return;
+    final state = stateOf(conversationId);
+    _emit(
+      state.copyWith(
+        pending: state.pending
+            .map((m) => m.copyWith(status: PendingStatus.queued))
+            .toList(),
+      ),
+    );
+    await _flushPending(conversationId, client);
+  }
+
+  Future<void> _flushPending(
+    String conversationId,
+    AgentServerClient client,
+  ) async {
+    var state = stateOf(conversationId);
+    final outstanding = state.pending
+        .where((m) => m.status != PendingStatus.sending)
+        .toList();
+    for (final message in outstanding) {
+      state = stateOf(conversationId);
+      final index = state.pending.indexWhere((m) => m.id == message.id);
+      if (index < 0) continue;
+      final sending = [...state.pending];
+      sending[index] = message.copyWith(status: PendingStatus.sending);
+      _emit(state.copyWith(pending: sending));
+      try {
+        await client.sendMessage(message.text);
+        final after = stateOf(conversationId);
+        _emit(
+          after.copyWith(
+            pending: after.pending.where((m) => m.id != message.id).toList(),
+          ),
+        );
+      } catch (error) {
+        final after = stateOf(conversationId);
+        _emit(
+          after.copyWith(
+            pending: after.pending
+                .map(
+                  (m) => m.id == message.id
+                      ? m.copyWith(status: PendingStatus.failed)
+                      : m,
+                )
+                .toList(),
+            error: 'Could not send: $error',
+          ),
+        );
+        return;
+      }
+    }
   }
 
   Future<void> interrupt(String conversationId) async {
     await _clients[conversationId]?.interrupt();
   }
 
+  /// Fetches the page before the oldest known event. Only ever called because
+  /// the user explicitly scrolled up.
   Future<HistoryPage> loadOlder(String conversationId) async {
     final client = _clients[conversationId];
     final current = stateOf(conversationId);
     if (client == null || current.events.isEmpty) {
       return const HistoryPage(events: [], hasMore: false);
     }
+    if (!current.hasOlderHistory) {
+      return const HistoryPage(events: [], hasMore: false);
+    }
     final oldest = current.events.first.timestamp?.toIso8601String();
     if (oldest == null) return const HistoryPage(events: [], hasMore: false);
     final page = await client.fetchOlder(beforeTimestamp: oldest);
     if (page.events.isNotEmpty) {
-      _emit(current.copyWith(events: [...page.events, ...current.events]));
+      final merged = _dedupe([...page.events, ...current.events]);
+      _emit(
+        stateOf(conversationId).copyWith(
+          events: merged,
+          hasOlderHistory: page.hasMore,
+        ),
+      );
+      _persist(conversationId, merged);
+    } else {
+      _emit(stateOf(conversationId).copyWith(hasOlderHistory: false));
     }
     return page;
+  }
+
+  List<ConversationEvent> _dedupe(List<ConversationEvent> events) {
+    final seen = <String>{};
+    final result = <ConversationEvent>[];
+    for (final event in events) {
+      if (seen.add(event.id)) result.add(event);
+    }
+    return result;
+  }
+
+  /// Writes the transcript to disk, coalescing bursts of events into one write
+  /// so a fast-streaming agent does not hammer the filesystem.
+  void _persist(String conversationId, List<ConversationEvent> events) {
+    _cacheTimers[conversationId]?.cancel();
+    _cacheTimers[conversationId] = Timer(const Duration(milliseconds: 400), () {
+      _cacheTimers.remove(conversationId);
+      unawaited(_cache.save(conversationId, events));
+    });
   }
 
   void markRead(String conversationId) {
     _emit(stateOf(conversationId).copyWith(unreadCount: 0));
   }
 
-  Future<void> close(String conversationId) async {
+  /// Forgets a conversation: drops the socket, the in-memory state and, when
+  /// [forget] is set, the on-disk transcript.
+  Future<void> close(String conversationId, {bool forget = false}) async {
     _reconnectTimers.remove(conversationId)?.cancel();
+    _cacheTimers.remove(conversationId)?.cancel();
     await _clients.remove(conversationId)?.dispose();
     await _controllers.remove(conversationId)?.close();
     _states.remove(conversationId);
-    _opened.remove(conversationId);
+    _historyKnown.remove(conversationId);
+    if (forget) await _cache.clear(conversationId);
   }
 
   Future<void> disposeAll() async {
@@ -342,6 +507,13 @@ class SessionService {
       timer.cancel();
     }
     _reconnectTimers.clear();
+    // Flush any pending transcript write before tearing down.
+    for (final entry in _cacheTimers.entries) {
+      entry.value.cancel();
+      final events = _states[entry.key]?.events;
+      if (events != null) await _cache.save(entry.key, events);
+    }
+    _cacheTimers.clear();
     for (final client in _clients.values) {
       await client.dispose();
     }
@@ -351,6 +523,6 @@ class SessionService {
     }
     _controllers.clear();
     _states.clear();
-    _opened.clear();
+    _historyKnown.clear();
   }
 }

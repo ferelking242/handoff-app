@@ -1,4 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:material_ui/material_ui.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/conversation.dart';
 import '../services/cloud_api_service.dart';
@@ -91,3 +93,75 @@ final sessionStateProvider =
 final notificationInitProvider = FutureProvider<void>((ref) async {
   await NotificationService.instance.init();
 });
+
+/// Dark/light preference, persisted so the choice survives a restart.
+class ThemeModeNotifier extends Notifier<ThemeMode> {
+  static const _key = 'theme_mode';
+
+  @override
+  ThemeMode build() => ThemeMode.dark;
+
+  Future<void> restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString(_key);
+    if (stored == 'light') state = ThemeMode.light;
+    if (stored == 'dark') state = ThemeMode.dark;
+  }
+
+  Future<void> toggle() async {
+    state = state == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_key, state == ThemeMode.dark ? 'dark' : 'light');
+  }
+}
+
+final themeModeProvider = NotifierProvider<ThemeModeNotifier, ThemeMode>(
+  ThemeModeNotifier.new,
+);
+
+/// Conversations hidden from the list on this device.
+class HiddenConversationsNotifier extends Notifier<Set<String>> {
+  static const _key = 'hidden_conversations';
+
+  @override
+  Set<String> build() => const {};
+
+  Future<void> restore() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = (prefs.getStringList(_key) ?? const []).toSet();
+  }
+
+  Future<void> hide(String conversationId) async {
+    state = {...state, conversationId};
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_key, state.toList());
+  }
+}
+
+final hiddenConversationsProvider =
+    NotifierProvider<HiddenConversationsNotifier, Set<String>>(
+      HiddenConversationsNotifier.new,
+    );
+
+/// The conversation list with locally-hidden entries removed.
+final visibleConversationsProvider =
+    Provider<AsyncValue<List<CloudConversation>>>((ref) {
+      final conversations = ref.watch(conversationsProvider);
+      final hidden = ref.watch(hiddenConversationsProvider);
+      if (hidden.isEmpty) return conversations;
+      return conversations.whenData(
+        (items) => items.where((c) => !hidden.contains(c.id)).toList(),
+      );
+    });
+
+/// Free-text filter over the conversation list.
+final conversationQueryProvider = NotifierProvider<ConversationQueryNotifier, String>(
+  ConversationQueryNotifier.new,
+);
+
+class ConversationQueryNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+
+  void set(String value) => state = value;
+}

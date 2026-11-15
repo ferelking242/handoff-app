@@ -36,6 +36,12 @@ class FakeAgentServer {
   final sockets = <WebSocket>[];
   final requests = <String>[];
 
+  /// Bodies of user messages POSTed to the events endpoint.
+  final sentMessages = <String>[];
+
+  /// When set, the next POST to the events endpoint answers 500.
+  bool failNextEventPost = false;
+
   /// Events returned by the REST history endpoint, oldest-first.
   List<Map<String, dynamic>> history = [];
   String executionStatus = 'idle';
@@ -83,6 +89,26 @@ class FakeAgentServer {
       return;
     }
     if (path.endsWith('/events')) {
+      final body = await utf8.decoder.bind(request).join();
+      if (failNextEventPost) {
+        failNextEventPost = false;
+        request.response.statusCode = HttpStatus.internalServerError;
+        await request.response.close();
+        return;
+      }
+      try {
+        final decoded = jsonDecode(body) as Map<String, dynamic>;
+        final message = decoded['message'] as Map<String, dynamic>?;
+        final content = message?['content'];
+        if (content is List && content.isNotEmpty) {
+          final first = content.first;
+          if (first is Map && first['text'] is String) {
+            sentMessages.add(first['text'] as String);
+          }
+        }
+      } catch (_) {
+        // Non-message POSTs are ignored by the recorder.
+      }
       _json(request, {'ok': true});
       return;
     }
@@ -282,5 +308,61 @@ void main() {
     }, seq: 2);
     await waitFor(() => notifier.calls.isNotEmpty);
     expect(notifier.calls.single, contains('finished the task'));
+  });
+  test('a cached conversation is never refetched, even after a restart', () async {
+    server.history = [server.messageEvent('m1', 'user', 'hello')];
+    await service.open(server.conversation);
+    await waitFor(() => service.stateOf(server.conversationId).events.isNotEmpty);
+    final cacheFile = File('${tempDir.path}/events/${server.conversationId}.json');
+    await waitFor(() => cacheFile.existsSync());
+
+    final fetchesBefore = server.requests
+        .where((r) => r.contains('events/search'))
+        .length;
+
+    // A brand-new service stands in for a relaunched app: the transcript is on
+    // disk, so the history endpoint must not be called again.
+    final restarted = SessionService(
+      cache: EventCache(tempDir),
+      notifications: notifier,
+    );
+    addTearDown(restarted.disposeAll);
+    await restarted.open(server.conversation);
+
+    final fetchesAfter = server.requests
+        .where((r) => r.contains('events/search'))
+        .length;
+    expect(fetchesAfter, fetchesBefore);
+    expect(restarted.stateOf(server.conversationId).events.single.id, 'm1');
+  });
+
+  test('a message is queued locally and reaches the server', () async {
+    await service.open(server.conversation);
+    await waitFor(() => server.sockets.isNotEmpty);
+
+    await service.sendMessage(server.conversationId, 'do the thing');
+    await waitFor(() => server.sentMessages.isNotEmpty);
+
+    expect(server.sentMessages.single, 'do the thing');
+    // Once accepted, the optimistic bubble is gone.
+    expect(service.stateOf(server.conversationId).pending, isEmpty);
+  });
+
+  test('a failed send keeps the message queued and retries on demand', () async {
+    await service.open(server.conversation);
+    await waitFor(() => server.sockets.isNotEmpty);
+
+    server.failNextEventPost = true;
+    await service.sendMessage(server.conversationId, 'flaky');
+    await waitFor(
+      () => service
+          .stateOf(server.conversationId)
+          .pending
+          .any((m) => m.status == PendingStatus.failed),
+    );
+
+    await service.retryPending(server.conversationId);
+    await waitFor(() => server.sentMessages.contains('flaky'));
+    expect(service.stateOf(server.conversationId).pending, isEmpty);
   });
 }

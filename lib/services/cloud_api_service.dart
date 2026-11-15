@@ -140,6 +140,16 @@ class CloudApiService {
     throw const CloudApiException('Timed out waiting for the conversation to start.');
   }
 
+  /// Deletes a conversation on the server. Some deployments do not expose a
+  /// delete route; the caller falls back to hiding it locally when this
+  /// throws.
+  Future<void> deleteConversation(String id) async {
+    await _dio.delete<void>(
+      AppConfig.appConversationsPath,
+      queryParameters: {'ids': id},
+    );
+  }
+
   /// Validates the bearer token and returns the account payload.
   Future<Map<String, dynamic>> currentUser() async {
     final response = await _dio.get<Map<String, dynamic>>('/api/v1/users/me');
