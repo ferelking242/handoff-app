@@ -58,7 +58,9 @@ void main() {
       ),
     );
     expect(find.text('My conversation'), findsOneWidget);
-    await tester.tap(find.byType(IconButton));
+    // The header draws a custom circular button, not an IconButton, so target
+    // the menu glyph itself.
+    await tester.tap(find.byIcon(AppIcons.menu));
     expect(tapped, isTrue);
   });
 

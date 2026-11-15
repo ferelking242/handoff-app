@@ -79,18 +79,37 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
     final state =
         live.value ?? ref.read(sessionServiceProvider).stateOf(widget.conversation.id);
 
+    // The header floats over the transcript rather than sitting above it, so
+    // the messages scroll underneath the soft wash (Kelivo's app bar does the
+    // same). The list gets top padding equal to the header so the first message
+    // still starts clear of it.
     return Column(
       children: [
-        _Header(conversation: widget.conversation, state: state, onBack: widget.onBack),
         Expanded(
-          child: _Transcript(
-            state: state,
-            controller: _scrollController,
-            onLoadOlder: _loadOlder,
-            loadingOlder: _loadingOlder,
-            onRetry: () => ref
-                .read(sessionServiceProvider)
-                .retryPending(widget.conversation.id),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: _Transcript(
+                  state: state,
+                  controller: _scrollController,
+                  onLoadOlder: _loadOlder,
+                  loadingOlder: _loadingOlder,
+                  onRetry: () => ref
+                      .read(sessionServiceProvider)
+                      .retryPending(widget.conversation.id),
+                ),
+              ),
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _Header(
+                  conversation: widget.conversation,
+                  state: state,
+                  onBack: widget.onBack,
+                ),
+              ),
+            ],
           ),
         ),
         if (state.error != null)
@@ -127,6 +146,7 @@ class _Header extends StatelessWidget {
     final theme = Theme.of(context);
     return PaneHeader(
       onMenu: onBack,
+      avatar: _AgentMark(state: state),
       title: Text(
         state.title.isEmpty ? conversation.title : state.title,
         maxLines: 1,
@@ -152,6 +172,30 @@ class _Header extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// The round mark the header shows before the title: the Handoff glyph tinted
+/// by the agent's live state, so the header itself tells you whether the agent
+/// is working without reading the status chip.
+class _AgentMark extends StatelessWidget {
+  const _AgentMark({required this.state});
+
+  final SessionState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = StatusChip.colorFor(state.agentState);
+    return Container(
+      width: 32,
+      height: 32,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.14),
+        shape: BoxShape.circle,
+      ),
+      alignment: Alignment.center,
+      child: Icon(AppIcons.flash, size: 17, color: color),
     );
   }
 }
@@ -202,7 +246,14 @@ class _Transcript extends StatelessWidget {
       child: ListView.builder(
         controller: controller,
         reverse: true,
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+        // The top inset clears the floating header so the oldest message is
+        // never trapped underneath it.
+        padding: EdgeInsets.fromLTRB(
+          12,
+          PaneHeader.barHeight + MediaQuery.paddingOf(context).top + 8,
+          12,
+          8,
+        ),
         itemCount: children.length,
         itemBuilder: (context, index) => children[index],
       ),
