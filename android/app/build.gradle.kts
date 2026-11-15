@@ -31,12 +31,13 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // ARM64 (arm64-v8a) only for now: one APK for modern 64-bit phones
-        // such as the Galaxy S21. Other ABIs are added later.
-        ndk {
-            abiFilters += listOf("arm64-v8a")
-        }
     }
+
+    // ARM64 (arm64-v8a) only for now: one APK for modern 64-bit phones such as
+    // the Galaxy S21. The release build passes --split-per-abi, which emits a
+    // single-ABI APK. Do NOT add defaultConfig.ndk.abiFilters here: Gradle
+    // rejects it when splits are active ("abiFilters cannot be present when
+    // splits abi filters are set"). Widen the split list to add ABIs later.
 
     signingConfigs {
         if (keystorePropertiesFile.exists()) {
