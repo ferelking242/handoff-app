@@ -1,0 +1,66 @@
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+/// Native notifications for agent state changes.
+///
+/// The Canvas only plays a sound, and only when the user enabled it, so a
+/// backgrounded agent finishing is silent. This posts a real system
+/// notification the OS shows even when the app is not in the foreground.
+class NotificationService {
+  NotificationService._();
+
+  static final NotificationService instance = NotificationService._();
+
+  final _plugin = FlutterLocalNotificationsPlugin();
+  bool _initialized = false;
+
+  static const _channelId = 'agent_activity';
+  static const _channelName = 'Agent activity';
+  static const _channelDescription =
+      'Alerts when an agent needs your input or finishes.';
+
+  Future<void> init() async {
+    if (_initialized) return;
+    const android = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const settings = InitializationSettings(android: android);
+    await _plugin.initialize(settings: settings);
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin
+        >()
+        ?.requestNotificationsPermission();
+    _initialized = true;
+  }
+
+  /// Posts (or updates) the notification for one conversation. The id is
+  /// derived from the conversation id so a new state replaces the old one
+  /// instead of stacking duplicates.
+  Future<void> showAgentState({
+    required String conversationId,
+    required String title,
+    required String body,
+  }) async {
+    await init();
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        _channelId,
+        _channelName,
+        channelDescription: _channelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+        styleInformation: BigTextStyleInformation(''),
+        category: AndroidNotificationCategory.status,
+      ),
+    );
+    await _plugin.show(
+      id: conversationId.hashCode & 0x7fffffff,
+      title: title,
+      body: body,
+      notificationDetails: details,
+      payload: conversationId,
+    );
+  }
+
+  Future<void> cancelFor(String conversationId) async {
+    await _plugin.cancel(id: conversationId.hashCode & 0x7fffffff);
+  }
+}
