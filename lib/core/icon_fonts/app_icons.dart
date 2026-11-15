@@ -70,10 +70,14 @@ class AppIcons {
   static const IconData moon = IconData(0xea4e, fontFamily: _f);
   static const IconData notification = IconData(0xea2a, fontFamily: _f);
   static const IconData notificationStatus = IconData(0xea2b, fontFamily: _f);
-  static const IconData code = IconData(0xeb98, fontFamily: _f);
-  static const IconData terminal = IconData(0xeb5e, fontFamily: _f);
+  static const IconData code = IconData(0xebae, fontFamily: _f);
+  static const IconData codeCircle = IconData(0xebaf, fontFamily: _f);
+  static const IconData terminal = IconData(0xeba6, fontFamily: _f);
+  static const IconData documentCode = IconData(0xeb6c, fontFamily: _f);
 
   // Filled variants
-  static const IconData messageFilled = IconData(0xea82, fontFamily: _ff);
+  static const IconData messageFilled = IconData(0xea82, fontFamily: _f);
+  static const IconData dislikeFilled = IconData(0xe900, fontFamily: _ff);
   static const IconData likeFilled = IconData(0xe901, fontFamily: _ff);
+  static const IconData heartFilled = IconData(0xe902, fontFamily: _ff);
 }

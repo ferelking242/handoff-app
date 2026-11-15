@@ -101,13 +101,17 @@ class _UserBubble extends StatelessWidget {
               topLeft: Radius.circular(AppRadius.lg),
               topRight: Radius.circular(AppRadius.lg),
               bottomLeft: Radius.circular(AppRadius.lg),
-              bottomRight: Radius.circular(6),
+              bottomRight: Radius.circular(AppRadius.xs),
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.14),
+              width: 0.8,
             ),
             boxShadow: [
               BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.25),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
+                color: AppColors.accent.withValues(alpha: 0.22),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -209,8 +213,11 @@ class _ToolCardState extends State<_ToolCard> {
           color: theme.colorScheme.surfaceContainerHighest.withValues(
             alpha: 0.5,
           ),
-          borderRadius: BorderRadius.circular(AppRadius.md),
-          border: Border.all(color: border),
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+          border: Border.all(
+            color: border.withValues(alpha: 0.9),
+            width: 0.8,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

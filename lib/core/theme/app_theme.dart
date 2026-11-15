@@ -46,11 +46,44 @@ class AppColors {
 
 class AppRadius {
   const AppRadius._();
+  static const double xs = 8;
   static const double sm = 10;
   static const double md = 14;
-  static const double lg = 20;
-  static const double xl = 26;
+  static const double lg = 16;
+  static const double xl = 20;
+  static const double capsule = 28;
   static const double pill = 999;
+}
+
+/// Spacing scale, used for every gap so the rhythm is consistent.
+class AppSpacing {
+  const AppSpacing._();
+  static const double xxs = 4;
+  static const double xs = 8;
+  static const double sm = 12;
+  static const double md = 16;
+  static const double lg = 20;
+  static const double xl = 28;
+}
+
+/// Elevation is expressed as a soft shadow rather than a Material elevation,
+/// so surfaces read as one calm stack instead of a pile of grey cards.
+class AppShadows {
+  const AppShadows._();
+  static List<BoxShadow> soft = [
+    BoxShadow(
+      color: const Color(0xFF000000).withValues(alpha: 0.05),
+      blurRadius: 18,
+      offset: const Offset(0, 6),
+    ),
+  ];
+  static List<BoxShadow> lifted = [
+    BoxShadow(
+      color: const Color(0xFF000000).withValues(alpha: 0.16),
+      blurRadius: 26,
+      offset: const Offset(0, 10),
+    ),
+  ];
 }
 
 class AppTheme {

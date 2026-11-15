@@ -72,7 +72,7 @@ class _ComposerState extends State<Composer> {
         child: Container(
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.xl),
+            borderRadius: BorderRadius.circular(AppRadius.capsule),
             border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
           padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
@@ -164,7 +164,7 @@ class _ActionButton extends StatelessWidget {
   }
 }
 
-class _RoundButton extends StatelessWidget {
+class _RoundButton extends StatefulWidget {
   const _RoundButton({
     super.key,
     required this.icon,
@@ -179,17 +179,33 @@ class _RoundButton extends StatelessWidget {
   final Color foreground;
 
   @override
+  State<_RoundButton> createState() => _RoundButtonState();
+}
+
+class _RoundButtonState extends State<_RoundButton> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
-    return Material(
-      color: background,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 42,
-          height: 42,
-          child: Icon(icon, size: 19, color: foreground),
+    return AnimatedScale(
+      scale: _pressed ? 0.92 : 1,
+      duration: const Duration(milliseconds: 120),
+      child: Material(
+        color: widget.background,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: widget.onTap,
+          onTapDown: widget.onTap == null
+              ? null
+              : (_) => setState(() => _pressed = true),
+          onTapUp: (_) => setState(() => _pressed = false),
+          onTapCancel: () => setState(() => _pressed = false),
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: Icon(widget.icon, size: 19, color: widget.foreground),
+          ),
         ),
       ),
     );
