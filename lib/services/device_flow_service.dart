@@ -171,22 +171,24 @@ class DeviceFlowService {
   }
 
   bool _isTransient(DioException error) {
-    switch (error.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-      case DioExceptionType.connectionError:
-        return true;
-      case DioExceptionType.badResponse:
-        final status = error.response?.statusCode;
-        return status != null && status >= 500;
-      case DioExceptionType.unknown:
-        // A SocketException (DNS failure, connection reset) arrives here.
-        return error.error is SocketException || error.error is HttpException;
-      case DioExceptionType.cancel:
-      case DioExceptionType.badCertificate:
-        return false;
+    // Written as an if-chain rather than an exhaustive switch: the
+    // DioExceptionType enum grows between dio versions (e.g. transformTimeout),
+    // and a transient-vs-fatal decision should not break on a new member.
+    if (error.type == DioExceptionType.connectionTimeout ||
+        error.type == DioExceptionType.sendTimeout ||
+        error.type == DioExceptionType.receiveTimeout ||
+        error.type == DioExceptionType.connectionError) {
+      return true;
     }
+    if (error.type == DioExceptionType.badResponse) {
+      final status = error.response?.statusCode;
+      return status != null && status >= 500;
+    }
+    if (error.type == DioExceptionType.unknown) {
+      // A SocketException (DNS failure, connection reset) arrives here.
+      return error.error is SocketException || error.error is HttpException;
+    }
+    return false;
   }
 
   /// Drives the full poll loop until approval, expiry, or [timeout].

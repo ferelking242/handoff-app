@@ -105,8 +105,8 @@ void main() {
       const _Reply(200, {'access_token': 'tok-123'}),
     ]);
 
-    expect(
-      () => service.pollOnce('dev-code'),
+    await expectLater(
+      service.pollOnce('dev-code'),
       throwsA(isA<AuthorizationPendingException>()),
     );
     expect(await service.pollOnce('dev-code'), 'tok-123');
