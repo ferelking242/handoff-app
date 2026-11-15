@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dio/dio.dart';
 
@@ -26,6 +27,26 @@ class DeviceFlowSession {
 /// Raised while the user has not yet approved the request.
 class AuthorizationPendingException implements Exception {
   const AuthorizationPendingException();
+}
+
+/// Raised when the server asks the client to poll more slowly. The server
+/// advertises a 5s interval but enforces 10s, so the returned interval must be
+/// honoured rather than the advertised one.
+class SlowDownException implements Exception {
+  const SlowDownException(this.interval);
+
+  final int? interval;
+}
+
+/// Raised for a recoverable transport failure (DNS, timeout, connection
+/// reset). The poll loop retries these instead of failing the whole sign-in.
+class TransientNetworkException implements Exception {
+  const TransientNetworkException(this.cause);
+
+  final Object cause;
+
+  @override
+  String toString() => '$cause';
 }
 
 /// Raised when the device code expired or the user denied the request.
@@ -58,13 +79,18 @@ class DeviceFlowService {
 
   final Dio _dio;
 
+  /// The server enforces at least this many seconds between polls.
+  static const int minPollSeconds = 10;
+
+  /// How many consecutive transport failures to ride out before giving up.
+  /// A phone on a flaky network hits these regularly; abandoning sign-in on
+  /// the first DNS hiccup is what made the flow look broken.
+  static const int maxTransportRetries = 8;
+
   Future<DeviceFlowSession> start() async {
-    final response = await _dio.post<Map<String, dynamic>>(
-      AppConfig.deviceAuthorizePath,
-      data: {'client_id': AppConfig.deviceFlowClientId},
-      options: Options(contentType: Headers.formUrlEncodedContentType),
-    );
-    final data = response.data ?? const <String, dynamic>{};
+    final data = await _post(AppConfig.deviceAuthorizePath, {
+      'client_id': AppConfig.deviceFlowClientId,
+    });
     final deviceCode = data['device_code'] as String?;
     final userCode = data['user_code'] as String?;
     final verificationUri = data['verification_uri'] as String?;
@@ -80,12 +106,15 @@ class DeviceFlowService {
       verificationUriComplete:
           (data['verification_uri_complete'] as String?) ?? verificationUri,
       expiresIn: (data['expires_in'] as num?)?.toInt() ?? 600,
-      interval: (data['interval'] as num?)?.toInt() ?? 5,
+      interval: (data['interval'] as num?)?.toInt() ?? minPollSeconds,
     );
   }
 
-  /// Polls once for the token. Throws [AuthorizationPendingException] while the
-  /// user has not approved yet, so the caller can keep the loop going.
+  /// Polls once for the token.
+  ///
+  /// Throws [AuthorizationPendingException] while the user has not approved
+  /// yet, [SlowDownException] when the server wants a longer gap, and
+  /// [TransientNetworkException] on a recoverable transport error.
   Future<String> pollOnce(String deviceCode) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
@@ -93,6 +122,7 @@ class DeviceFlowService {
         data: {
           'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
           'device_code': deviceCode,
+          'client_id': AppConfig.deviceFlowClientId,
         },
         options: Options(
           contentType: Headers.formUrlEncodedContentType,
@@ -104,39 +134,106 @@ class DeviceFlowService {
       if (response.statusCode == 200 && token != null) return token;
 
       final error = data['error'] as String?;
-      if (error == 'authorization_pending' || error == 'slow_down') {
-        throw const AuthorizationPendingException();
+      final description = data['error_description'] as String?;
+      switch (error) {
+        case 'authorization_pending':
+          throw const AuthorizationPendingException();
+        case 'slow_down':
+          throw SlowDownException((data['interval'] as num?)?.toInt());
+        case 'expired_token':
+          throw const DeviceFlowException(
+            'The code expired before it was approved. Please try again.',
+            'expired_token',
+          );
+        case 'access_denied':
+          throw const DeviceFlowException(
+            'Sign-in was denied on the website.',
+            'access_denied',
+          );
       }
       throw DeviceFlowException(
-        (data['error_description'] as String?) ??
-            'Authorization failed: ${error ?? 'unknown error'}',
+        description ?? 'Authorization failed: ${error ?? 'unknown error'}',
         error,
       );
     } on DioException catch (error) {
-      // A 4xx without a JSON body still means "not approved yet" in practice.
-      if (error.response?.statusCode == 400) {
-        final body = error.response?.data;
-        if (body is String && body.contains('authorization_pending')) {
-          throw const AuthorizationPendingException();
-        }
+      if (_isTransient(error)) {
+        throw TransientNetworkException(error.error ?? error.message ?? error);
+      }
+      // A 400 without a parseable body still means "not approved yet".
+      final body = error.response?.data;
+      if (error.response?.statusCode == 400 &&
+          body is String &&
+          body.contains('authorization_pending')) {
+        throw const AuthorizationPendingException();
       }
       rethrow;
     }
   }
 
+  bool _isTransient(DioException error) {
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+      case DioExceptionType.connectionError:
+        return true;
+      case DioExceptionType.badResponse:
+        final status = error.response?.statusCode;
+        return status != null && status >= 500;
+      case DioExceptionType.unknown:
+        // A SocketException (DNS failure, connection reset) arrives here.
+        return error.error is SocketException || error.error is HttpException;
+      case DioExceptionType.cancel:
+      case DioExceptionType.badCertificate:
+        return false;
+    }
+  }
+
   /// Drives the full poll loop until approval, expiry, or [timeout].
+  ///
+  /// Transient network failures are retried so a brief DNS or connectivity
+  /// blip does not throw away an authorization the user already completed.
   Future<String> awaitToken(
     DeviceFlowSession session, {
     Duration? timeout,
+    void Function(String status)? onStatus,
+    Duration minInterval = const Duration(seconds: minPollSeconds),
   }) async {
-    final deadline =
-        DateTime.now().add(timeout ?? Duration(seconds: session.expiresIn));
-    var interval = Duration(seconds: session.interval.clamp(1, 30));
+    final deadline = DateTime.now().add(
+      timeout ?? Duration(seconds: session.expiresIn),
+    );
+    var interval = Duration(
+      seconds: session.interval < minInterval.inSeconds
+          ? minInterval.inSeconds
+          : session.interval,
+    );
+    var transportFailures = 0;
 
     while (DateTime.now().isBefore(deadline)) {
       try {
         return await pollOnce(session.deviceCode);
       } on AuthorizationPendingException {
+        transportFailures = 0;
+      } on SlowDownException catch (error) {
+        interval = Duration(
+          seconds: (error.interval ?? interval.inSeconds + 5).clamp(
+            minInterval.inSeconds,
+            60,
+          ),
+        );
+      } on TransientNetworkException {
+        transportFailures++;
+        if (transportFailures >= maxTransportRetries) {
+          throw const DeviceFlowException(
+            'Could not reach app.all-hands.dev. Check your connection and try again.',
+            'network_error',
+          );
+        }
+        onStatus?.call(
+          'Network problem, retrying… ($transportFailures/$maxTransportRetries)',
+        );
+      }
+      if (DateTime.now().isBefore(deadline)) {
         await Future<void>.delayed(interval);
       }
     }
@@ -144,6 +241,18 @@ class DeviceFlowService {
       'The code expired before it was approved. Please try again.',
       'expired_token',
     );
+  }
+
+  Future<Map<String, dynamic>> _post(
+    String path,
+    Map<String, dynamic> body,
+  ) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      path,
+      data: body,
+      options: Options(contentType: Headers.formUrlEncodedContentType),
+    );
+    return response.data ?? const <String, dynamic>{};
   }
 }
 

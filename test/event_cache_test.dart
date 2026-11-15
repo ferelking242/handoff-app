@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:aivos/models/conversation_event.dart';
-import 'package:aivos/services/event_cache.dart';
+import 'package:handoff/models/conversation_event.dart';
+import 'package:handoff/services/event_cache.dart';
 
 void main() {
   late Directory tempDir;

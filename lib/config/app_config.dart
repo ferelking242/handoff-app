@@ -2,8 +2,8 @@
 class AppConfig {
   AppConfig._();
 
-  static const String appName = 'AIVOS';
-  static const String appTagline = 'OpenHands on mobile';
+  static const String appName = 'Handoff';
+  static const String appTagline = 'OpenHands Cloud, in your pocket';
 
   /// OpenHands Cloud host used for auth and account-level endpoints.
   static const String cloudHost = 'https://app.all-hands.dev';

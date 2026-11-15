@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:aivos/models/agent_state.dart';
-import 'package:aivos/models/conversation.dart';
-import 'package:aivos/models/conversation_event.dart';
+import 'package:handoff/models/agent_state.dart';
+import 'package:handoff/models/conversation.dart';
+import 'package:handoff/models/conversation_event.dart';
 
 void main() {
   group('AgentState.fromStatus', () {

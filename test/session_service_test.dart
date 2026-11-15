@@ -2,10 +2,10 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:aivos/models/conversation.dart';
-import 'package:aivos/services/event_cache.dart';
-import 'package:aivos/services/notification_service.dart';
-import 'package:aivos/services/session_service.dart';
+import 'package:handoff/models/conversation.dart';
+import 'package:handoff/services/event_cache.dart';
+import 'package:handoff/services/notification_service.dart';
+import 'package:handoff/services/session_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Records the alerts the session decides to raise.

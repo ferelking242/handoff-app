@@ -21,7 +21,7 @@ class ConversationsScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('AIVOS'),
+        title: const Text('Handoff'),
         actions: [
           IconButton(
             tooltip: 'Refresh',

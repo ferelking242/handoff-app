@@ -19,6 +19,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   DeviceFlowSession? _session;
   String? _error;
+  String? _status;
   bool _busy = false;
   Timer? _countdown;
   int _secondsLeft = 0;
@@ -33,6 +34,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() {
       _busy = true;
       _error = null;
+      _status = null;
     });
     try {
       final session = await ref.read(deviceFlowProvider).start();
@@ -50,7 +52,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       final token = await ref
           .read(deviceFlowProvider)
-          .awaitToken(session, timeout: Duration(seconds: session.expiresIn));
+          .awaitToken(
+            session,
+            timeout: Duration(seconds: session.expiresIn),
+            onStatus: (status) {
+              if (mounted) setState(() => _status = status);
+            },
+          );
       await ref.read(authProvider.notifier).signIn(token);
     } on DeviceFlowException catch (error) {
       if (mounted) setState(() => _error = error.message);
@@ -83,7 +91,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'AIVOS',
+                    'Handoff',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
@@ -162,7 +170,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const LinearProgressIndicator(),
                       const SizedBox(height: 8),
                       Text(
-                        'Waiting for approval…',
+                        _status ?? 'Waiting for approval…',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodySmall,
                       ),

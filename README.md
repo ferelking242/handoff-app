@@ -1,4 +1,4 @@
-# AIVOS
+# Handoff
 
 **A fast, native mobile client for [OpenHands Cloud](https://app.all-hands.dev).**
 
@@ -14,14 +14,14 @@ long-running work:
 3. **No notifications.** Nothing tells you when the agent finished or is waiting
    for your answer.
 
-AIVOS is a from-scratch Flutter client built around those three fixes.
+Handoff is a from-scratch Flutter client built around those three fixes.
 
-> AIVOS is an independent, unofficial client. It is not affiliated with or
+> Handoff is an independent, unofficial client. It is not affiliated with or
 > endorsed by All Hands AI.
 
 ## What it does differently
 
-| Problem | How AIVOS fixes it |
+| Problem | How Handoff fixes it |
 | --- | --- |
 | Agent "stops" on navigation | One **global session service** owns the WebSocket for the whole app lifetime. Screens subscribe to it; leaving a screen never closes the socket. |
 | History reloads repeatedly | Events are **cached on disk** per conversation, so the transcript paints instantly and only new events come over the network. |
@@ -68,7 +68,7 @@ local testing but must not be published.
 
 ## Signing in
 
-AIVOS uses the OAuth **device flow** (RFC 8628), so no password is ever typed
+Handoff uses the OAuth **device flow** (RFC 8628), so no password is ever typed
 into or stored by the app:
 
 1. Tap *Sign in with Cloud*. The app shows a short code.
@@ -78,7 +78,7 @@ into or stored by the app:
 ## How it talks to OpenHands
 
 ```
-AIVOS (Flutter)
+Handoff (Flutter)
   │
   ├─ HTTPS  app.all-hands.dev/api/v1/...        list/create conversations
   │         oauth/device/...                    sign-in
