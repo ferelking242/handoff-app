@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:handoff/core/theme/app_theme.dart';
 import 'package:handoff/models/agent_state.dart';
 import 'package:handoff/models/conversation_event.dart';
+import 'package:handoff/widgets/app_logo.dart';
 import 'package:handoff/widgets/composer.dart';
 import 'package:handoff/widgets/event_bubble.dart';
 import 'package:handoff/widgets/markdown_content.dart';
@@ -60,10 +61,16 @@ void main() {
       ),
     );
     expect(find.text('My conversation'), findsOneWidget);
+    expect(find.text('Handoff'), findsOneWidget);
     // The header draws a custom circular button, not an IconButton, so target
     // the menu glyph itself.
     await tester.tap(find.byIcon(LucideIcons.menu));
     expect(tapped, isTrue);
+    final menuX = tester.getTopLeft(find.byIcon(LucideIcons.menu)).dx;
+    final logoX = tester.getTopLeft(find.byType(AppLogoMark)).dx;
+    final nameX = tester.getTopLeft(find.text('Handoff')).dx;
+    expect(menuX, lessThan(logoX));
+    expect(logoX, lessThan(nameX));
   });
 
   testWidgets('TypingDots renders three animated dots', (tester) async {
@@ -87,8 +94,10 @@ void main() {
     await tester.pump();
 
     expect(sent, 'fix the build');
-    expect(tester.widget<TextField>(find.byType(TextField)).controller!.text,
-        isEmpty);
+    expect(
+      tester.widget<TextField>(find.byType(TextField)).controller!.text,
+      isEmpty,
+    );
   });
 
   testWidgets('Composer shows stop instead of send while busy', (tester) async {
@@ -128,7 +137,8 @@ void main() {
   testWidgets('MarkdownContent renders selectable formatted replies', (
     tester,
   ) async {
-    const reply = '## Summary\n\n**Done** with `formatting`.\n\n'
+    const reply =
+        '## Summary\n\n**Done** with `formatting`.\n\n'
         '```dart\nprint("ready");\n```';
     await pumpThemed(
       tester,

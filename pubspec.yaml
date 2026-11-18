@@ -74,6 +74,7 @@ flutter:
 
   assets:
     - assets/fonts/
+    - assets/handoff-app-icon.png
 
   fonts:
     # Icon font shared with watchtower (Apache-2.0). ~900 line icons at every

@@ -68,12 +68,17 @@ class _ComposerState extends State<Composer> {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 6, 12, 12),
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 10),
         child: Container(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.xl),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.92),
+            ),
+            boxShadow: Theme.of(context).brightness == Brightness.dark
+                ? AppShadows.soft
+                : const [],
           ),
           padding: const EdgeInsets.fromLTRB(14, 10, 8, 8),
           child: Column(

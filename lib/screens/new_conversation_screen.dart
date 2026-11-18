@@ -6,6 +6,7 @@ import 'package:material_ui/material_ui.dart';
 import '../core/theme/app_theme.dart';
 import '../models/conversation.dart';
 import '../providers/app_providers.dart';
+import '../widgets/app_logo.dart';
 import '../widgets/composer.dart';
 import '../widgets/pane_header.dart';
 
@@ -69,10 +70,7 @@ class _NewConversationScreenState extends ConsumerState<NewConversationScreen> {
                 )
               : null,
           title: const Text('New Chat'),
-          subtitle: Text(
-            'OpenHands Cloud',
-            style: theme.textTheme.labelSmall,
-          ),
+          subtitle: Text('OpenHands Cloud', style: theme.textTheme.labelSmall),
         ),
         Expanded(
           child: Center(
@@ -80,7 +78,7 @@ class _NewConversationScreenState extends ConsumerState<NewConversationScreen> {
               duration: const Duration(milliseconds: 220),
               child: _busy
                   ? const _StartingCard(key: ValueKey('starting'))
-                  : const SizedBox.shrink(key: ValueKey('empty-chat')),
+                  : const _NewChatEmptyState(key: ValueKey('empty-chat')),
             ),
           ),
         ),
@@ -122,6 +120,38 @@ class _NewConversationScreenState extends ConsumerState<NewConversationScreen> {
   }
 }
 
+class _NewChatEmptyState extends StatelessWidget {
+  const _NewChatEmptyState({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const AppLogoMark(size: 46),
+          const SizedBox(height: 18),
+          Text(
+            'What are we working on?',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleLarge?.copyWith(fontSize: 20),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            'Send a task to your OpenHands agent to get started.',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ).animate().fadeIn(duration: 260.ms).slideY(begin: 0.04, end: 0),
+    );
+  }
+}
+
 class _StartingCard extends StatelessWidget {
   const _StartingCard({super.key});
 
@@ -139,7 +169,10 @@ class _StartingCard extends StatelessWidget {
         children: [
           const CircularProgressIndicator(strokeWidth: 2.5),
           const SizedBox(height: 16),
-          Text('Starting your conversation…', style: theme.textTheme.titleSmall),
+          Text(
+            'Starting your conversation…',
+            style: theme.textTheme.titleSmall,
+          ),
           const SizedBox(height: 6),
           Text(
             'Handoff is provisioning the sandbox. This usually takes a few '

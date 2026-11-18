@@ -9,6 +9,7 @@ import '../core/theme/app_theme.dart';
 import '../models/agent_state.dart';
 import '../models/conversation.dart';
 import '../providers/app_providers.dart';
+import 'app_logo.dart';
 import 'status_chip.dart';
 
 /// The conversation browser: a drawer on phones, a permanent sidebar on wide
@@ -90,30 +91,51 @@ class _SidebarHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 8),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: const BoxDecoration(
-              gradient: AppColors.accentGradient,
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: const Icon(AppIcons.flash, size: 17, color: Colors.white),
+          Row(
+            children: [
+              const AppLogoMark(size: 34),
+              const SizedBox(width: 11),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Handoff',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontSize: 18,
+                        letterSpacing: -0.35,
+                      ),
+                    ),
+                    Text('OpenHands Cloud', style: theme.textTheme.labelSmall),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'Handoff',
-              style: theme.textTheme.titleLarge?.copyWith(fontSize: 18),
+          const SizedBox(height: 16),
+          SizedBox(
+            height: 42,
+            child: FilledButton.icon(
+              onPressed: onNew,
+              icon: const Icon(AppIcons.add, size: 17),
+              label: const Text('New chat'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.accent.withValues(alpha: 0.16),
+                foregroundColor: AppColors.accentBright,
+                alignment: Alignment.centerLeft,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppRadius.md),
+                  side: BorderSide(
+                    color: AppColors.accent.withValues(alpha: 0.24),
+                  ),
+                ),
+              ),
             ),
-          ),
-          IconButton(
-            tooltip: 'New conversation',
-            onPressed: onNew,
-            icon: const Icon(AppIcons.add),
           ),
         ],
       ),
@@ -295,8 +317,8 @@ class _ConversationRow extends ConsumerWidget {
     final state =
         live.value ?? ref.read(sessionServiceProvider).stateOf(conversation.id);
     final unread = state.unreadCount;
-    final updated =
-        (conversation.updatedAt ?? conversation.createdAt)?.toLocal();
+    final updated = (conversation.updatedAt ?? conversation.createdAt)
+        ?.toLocal();
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 2),
@@ -522,7 +544,9 @@ class _SidebarFooter extends ConsumerWidget {
     final isDark = theme.brightness == Brightness.dark;
     return Container(
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: theme.colorScheme.outlineVariant)),
+        border: Border(
+          top: BorderSide(color: theme.colorScheme.outlineVariant),
+        ),
       ),
       padding: const EdgeInsets.fromLTRB(10, 8, 6, 10),
       child: Row(

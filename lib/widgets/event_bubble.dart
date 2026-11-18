@@ -168,7 +168,7 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
                         const SizedBox(width: 8),
                         Text(
                           DateFormat(
-                            'yyyy-MM-dd HH:mm:ss',
+                            'MMM d · HH:mm',
                           ).format(widget.event.timestamp!.toLocal()),
                           style: theme.textTheme.labelSmall,
                         ),
@@ -262,14 +262,9 @@ class _ToolCardState extends State<_ToolCard> {
       constraints: const BoxConstraints(maxWidth: 680),
       child: Container(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerHighest.withValues(
-            alpha: 0.5,
-          ),
-          borderRadius: BorderRadius.circular(AppRadius.lg),
-          border: Border.all(
-            color: border.withValues(alpha: 0.9),
-            width: 0.8,
-          ),
+          color: theme.colorScheme.surface.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: border.withValues(alpha: 0.9), width: 0.8),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -294,11 +289,7 @@ class _ToolCardState extends State<_ToolCard> {
                         borderRadius: BorderRadius.circular(8),
                       ),
                       alignment: Alignment.center,
-                      child: Icon(
-                        widget.icon,
-                        size: 14,
-                        color: widget.accent,
-                      ),
+                      child: Icon(widget.icon, size: 14, color: widget.accent),
                     ),
                     const SizedBox(width: 10),
                     Expanded(

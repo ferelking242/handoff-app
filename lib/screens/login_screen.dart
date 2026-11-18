@@ -8,6 +8,7 @@ import '../core/icon_fonts/app_icons.dart';
 import '../core/theme/app_theme.dart';
 import '../providers/app_providers.dart';
 import '../services/device_flow_service.dart';
+import '../widgets/app_logo.dart';
 
 /// Device-flow sign-in. No password is typed into the app: the user opens a
 /// short URL in any browser, approves, and the app picks up the token.
@@ -86,22 +87,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Center(
-                    child: Container(
-                      width: 76,
-                      height: 76,
-                      decoration: const BoxDecoration(
-                        gradient: AppColors.accentGradient,
-                        shape: BoxShape.circle,
-                      ),
-                      alignment: Alignment.center,
-                      child: const Icon(
-                        AppIcons.flash,
-                        size: 34,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
+                  Center(child: const AppLogoMark(size: 76)),
                   const SizedBox(height: 22),
                   Text(
                     'Handoff',
@@ -118,11 +104,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 34),
                   if (session == null)
-                    _SignInCard(
-                      busy: _busy,
-                      onStart: _start,
-                      error: _error,
-                    )
+                    _SignInCard(busy: _busy, onStart: _start, error: _error)
                   else
                     _DeviceCodeCard(
                       session: session,
@@ -238,10 +220,7 @@ class _DeviceCodeCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              Text(
-                'ENTER THIS CODE',
-                style: theme.textTheme.labelSmall,
-              ),
+              Text('ENTER THIS CODE', style: theme.textTheme.labelSmall),
               const SizedBox(height: 12),
               SelectableText(
                 session.userCode,

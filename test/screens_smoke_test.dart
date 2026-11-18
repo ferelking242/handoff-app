@@ -54,8 +54,10 @@ void main() {
     await tester.pumpWidget(app(const HomeScreen()));
     await tester.pump(const Duration(milliseconds: 350));
 
+    expect(find.text('Handoff'), findsOneWidget);
     expect(find.text('New Chat'), findsOneWidget);
     expect(find.text('OpenHands Cloud'), findsOneWidget);
+    expect(find.text('What are we working on?'), findsOneWidget);
     expect(find.byType(TextField), findsOneWidget);
   });
 
@@ -94,7 +96,9 @@ void main() {
     await tester.binding.setSurfaceSize(const Size(1280, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
-    await tester.pumpWidget(app(const HomeScreen(), size: const Size(1280, 900)));
+    await tester.pumpWidget(
+      app(const HomeScreen(), size: const Size(1280, 900)),
+    );
     await tester.pump(const Duration(milliseconds: 350));
 
     // Wide layout keeps the sidebar visible beside the landing pane.

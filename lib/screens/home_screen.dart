@@ -24,8 +24,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   CloudConversation? _selected;
 
-  bool get _isWide =>
-      MediaQuery.sizeOf(context).width >= _wideBreakpoint;
+  bool get _isWide => MediaQuery.sizeOf(context).width >= _wideBreakpoint;
 
   void _open(CloudConversation conversation) {
     if (!_isWide) _scaffoldKey.currentState?.closeDrawer();
@@ -51,7 +50,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         body: Row(
           children: [
             SizedBox(
-              width: 300,
+              width: 286,
               child: Container(
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface,
@@ -77,8 +76,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.only(
-            topRight: Radius.circular(AppRadius.xl),
-            bottomRight: Radius.circular(AppRadius.xl),
+            topRight: Radius.circular(AppRadius.lg),
+            bottomRight: Radius.circular(AppRadius.lg),
           ),
         ),
         child: SafeArea(child: sidebar),
@@ -92,16 +91,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (selected != null) {
       return ConversationScreen(
         conversation: selected,
-        onMenu: isWide
-            ? null
-            : () => _scaffoldKey.currentState?.openDrawer(),
+        onMenu: isWide ? null : () => _scaffoldKey.currentState?.openDrawer(),
       );
     }
     return NewConversationScreen(
       onOpen: _open,
-      onMenu: isWide
-          ? null
-          : () => _scaffoldKey.currentState?.openDrawer(),
+      onMenu: isWide ? null : () => _scaffoldKey.currentState?.openDrawer(),
     );
   }
 }

@@ -1,7 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../config/app_config.dart';
 import '../core/theme/app_theme.dart';
+import 'app_logo.dart';
 
 /// The slim, chrome-free header every pane draws over its content.
 ///
@@ -22,7 +24,7 @@ class PaneHeader extends StatelessWidget {
   });
 
   /// Height of the bar itself, excluding the status-bar inset.
-  static const double barHeight = 56;
+  static const double barHeight = 84;
 
   final Widget? title;
   final Widget? subtitle;
@@ -47,49 +49,137 @@ class PaneHeader extends StatelessWidget {
           Positioned.fill(child: _HeaderWash(theme: theme)),
           Padding(
             padding: EdgeInsets.only(top: topInset),
+            child: onMenu != null
+                ? _MobileHeader(
+                    title: title,
+                    subtitle: subtitle,
+                    actions: actions,
+                    onMenu: onMenu!,
+                    theme: theme,
+                  )
+                : Row(
+                    children: [
+                      if (leading != null) leading!,
+                      const SizedBox(width: 2),
+                      if (avatar != null) ...[
+                        avatar!,
+                        const SizedBox(width: AppSpacing.xs + 2),
+                      ],
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            if (title != null)
+                              DefaultTextStyle.merge(
+                                style: theme.textTheme.titleMedium!.copyWith(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: -0.2,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                child: title!,
+                              ),
+                            if (subtitle != null) ...[
+                              const SizedBox(height: 2),
+                              subtitle!,
+                            ],
+                          ],
+                        ),
+                      ),
+                      ...actions,
+                      const SizedBox(width: AppSpacing.xs),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MobileHeader extends StatelessWidget {
+  const _MobileHeader({
+    required this.title,
+    required this.subtitle,
+    required this.actions,
+    required this.onMenu,
+    required this.theme,
+  });
+
+  final Widget? title;
+  final Widget? subtitle;
+  final List<Widget> actions;
+  final VoidCallback onMenu;
+  final ThemeData theme;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            height: 44,
             child: Row(
               children: [
-                if (onMenu != null)
-                  _HeaderIconButton(
-                    icon: LucideIcons.menu,
-                    tooltip: 'Conversations',
-                    onTap: onMenu,
-                  )
-                else if (leading != null)
-                  leading!,
-                const SizedBox(width: 2),
-                if (avatar != null) ...[
-                  avatar!,
-                  const SizedBox(width: AppSpacing.xs + 2),
-                ],
+                _HeaderIconButton(
+                  icon: LucideIcons.menu,
+                  tooltip: 'Conversations',
+                  onTap: onMenu,
+                ),
+                const SizedBox(width: 4),
+                const AppLogoMark(size: 29),
+                const SizedBox(width: 9),
                 Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (title != null)
-                        DefaultTextStyle.merge(
-                          style: theme.textTheme.titleMedium!.copyWith(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: -0.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          child: title!,
-                        ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 2),
-                        subtitle!,
-                      ],
-                    ],
+                  child: Text(
+                    AppConfig.appName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.35,
+                    ),
                   ),
                 ),
                 ...actions,
-                const SizedBox(width: AppSpacing.xs),
               ],
             ),
           ),
+          if (title != null || subtitle != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 85, right: 4, bottom: 4),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (title != null)
+                    DefaultTextStyle.merge(
+                      style: theme.textTheme.titleSmall!.copyWith(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      child: title!,
+                    ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    DefaultTextStyle.merge(
+                      style: theme.textTheme.labelSmall!.copyWith(fontSize: 10),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      child: subtitle!,
+                    ),
+                  ],
+                ],
+              ),
+            ),
         ],
       ),
     );

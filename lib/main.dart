@@ -2,11 +2,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/app_config.dart';
-import 'core/icon_fonts/app_icons.dart';
 import 'core/theme/app_theme.dart';
 import 'providers/app_providers.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'widgets/app_logo.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -83,16 +83,7 @@ class _Splash extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 64,
-              height: 64,
-              decoration: const BoxDecoration(
-                gradient: AppColors.accentGradient,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Icon(AppIcons.flash, size: 28, color: Colors.white),
-            ),
+            const AppLogoMark(size: 64),
             const SizedBox(height: 22),
             const SizedBox(
               width: 22,
