@@ -1,0 +1,1 @@
+- [Handoff UI-only port](handoff-ui-port.md) — preserve Handoff’s OpenHands session and transport logic when changing its presentation.
