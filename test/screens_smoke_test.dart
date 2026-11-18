@@ -54,9 +54,9 @@ void main() {
     await tester.pumpWidget(app(const HomeScreen()));
     await tester.pump(const Duration(milliseconds: 350));
 
-    expect(find.text('Handoff'), findsWidgets);
-    expect(find.text('What should the agent do?'), findsOneWidget);
-    expect(find.text('New conversation'), findsOneWidget);
+    expect(find.text('New Chat'), findsOneWidget);
+    expect(find.text('OpenHands Cloud'), findsOneWidget);
+    expect(find.byType(TextField), findsOneWidget);
   });
 
   testWidgets('the conversation screen lays out with a transcript', (
