@@ -209,7 +209,7 @@ class _AssistantBubbleState extends State<_AssistantBubble> {
 }
 
 class _AgentAvatar extends StatelessWidget {
-  const _AgentAvatar({super.key});
+  const _AgentAvatar();
 
   @override
   Widget build(BuildContext context) {

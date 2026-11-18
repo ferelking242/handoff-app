@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart' as flutter;
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -14,7 +15,9 @@ class MarkdownContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
-    final base = MarkdownStyleSheet.fromTheme(theme);
+    final base = MarkdownStyleSheet.fromTheme(
+      flutter.ThemeData(brightness: theme.brightness, useMaterial3: true),
+    );
 
     return MarkdownBody(
       data: data,
