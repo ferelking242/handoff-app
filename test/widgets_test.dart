@@ -1,13 +1,15 @@
+import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:handoff/core/icon_fonts/app_icons.dart';
 import 'package:handoff/core/theme/app_theme.dart';
 import 'package:handoff/models/agent_state.dart';
 import 'package:handoff/models/conversation_event.dart';
 import 'package:handoff/widgets/composer.dart';
 import 'package:handoff/widgets/event_bubble.dart';
+import 'package:handoff/widgets/markdown_content.dart';
 import 'package:handoff/widgets/pane_header.dart';
 import 'package:handoff/widgets/status_chip.dart';
 import 'package:handoff/widgets/typing_dots.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// Pumps [child] inside the real app theme, so a layout error (an unbounded
@@ -60,7 +62,7 @@ void main() {
     expect(find.text('My conversation'), findsOneWidget);
     // The header draws a custom circular button, not an IconButton, so target
     // the menu glyph itself.
-    await tester.tap(find.byIcon(AppIcons.menu));
+    await tester.tap(find.byIcon(LucideIcons.menu));
     expect(tapped, isTrue);
   });
 
@@ -81,7 +83,7 @@ void main() {
 
     await tester.enterText(find.byType(TextField), 'fix the build');
     await tester.pump();
-    await tester.tap(find.byIcon(AppIcons.send));
+    await tester.tap(find.byIcon(LucideIcons.arrowUp));
     await tester.pump();
 
     expect(sent, 'fix the build');
@@ -95,7 +97,7 @@ void main() {
       tester,
       Composer(onSend: (_) {}, onStop: () => stopped = true, busy: true),
     );
-    await tester.tap(find.byIcon(AppIcons.stop));
+    await tester.tap(find.byIcon(LucideIcons.square));
     expect(stopped, isTrue);
   });
 
@@ -118,7 +120,25 @@ void main() {
       ),
     );
     expect(find.text('hello there'), findsOneWidget);
-    expect(find.text('working on it'), findsOneWidget);
+    final markdown = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
+    expect(markdown.data, 'working on it');
+    expect(markdown.selectable, isTrue);
+  });
+
+  testWidgets('MarkdownContent renders selectable formatted replies', (
+    tester,
+  ) async {
+    const reply = '## Summary\n\n**Done** with `formatting`.\n\n'
+        '```dart\nprint("ready");\n```';
+    await pumpThemed(
+      tester,
+      const SingleChildScrollView(child: MarkdownContent(data: reply)),
+    );
+
+    final markdown = tester.widget<MarkdownBody>(find.byType(MarkdownBody));
+    expect(markdown.data, reply);
+    expect(markdown.selectable, isTrue);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('EventBubble collapses a tool call and expands it on tap', (

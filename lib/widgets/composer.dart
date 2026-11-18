@@ -1,6 +1,6 @@
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../core/icon_fonts/app_icons.dart';
 import '../core/theme/app_theme.dart';
 
 /// The message box.
@@ -11,7 +11,7 @@ class Composer extends StatefulWidget {
   const Composer({
     super.key,
     required this.onSend,
-    required this.onStop,
+    this.onStop,
     this.busy = false,
     this.enabled = true,
     this.hintText = 'Message the agent…',
@@ -19,7 +19,7 @@ class Composer extends StatefulWidget {
   });
 
   final void Function(String text) onSend;
-  final VoidCallback onStop;
+  final VoidCallback? onStop;
   final bool busy;
   final bool enabled;
   final String hintText;
@@ -72,44 +72,64 @@ class _ComposerState extends State<Composer> {
         child: Container(
           decoration: BoxDecoration(
             color: theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(AppRadius.capsule),
+            borderRadius: BorderRadius.circular(AppRadius.xl),
             border: Border.all(color: theme.colorScheme.outlineVariant),
           ),
-          padding: const EdgeInsets.fromLTRB(6, 4, 6, 4),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  focusNode: _focus,
-                  autofocus: widget.autofocus,
-                  enabled: widget.enabled,
-                  minLines: 1,
-                  maxLines: 6,
-                  textCapitalization: TextCapitalization.sentences,
-                  textInputAction: TextInputAction.newline,
-                  style: theme.textTheme.bodyMedium,
-                  decoration: InputDecoration(
-                    hintText: widget.hintText,
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    filled: false,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 12,
-                    ),
-                  ),
+              TextField(
+                controller: _controller,
+                focusNode: _focus,
+                autofocus: widget.autofocus,
+                enabled: widget.enabled,
+                minLines: 1,
+                maxLines: 6,
+                textCapitalization: TextCapitalization.sentences,
+                textInputAction: TextInputAction.newline,
+                style: theme.textTheme.bodyMedium,
+                decoration: InputDecoration(
+                  hintText: widget.hintText,
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                  isDense: true,
+                  contentPadding: const EdgeInsets.fromLTRB(2, 8, 2, 12),
                 ),
               ),
-              const SizedBox(width: 4),
-              _ActionButton(
-                busy: widget.busy,
-                canSend: canSend,
-                onSend: _submit,
-                onStop: widget.onStop,
+              Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.16),
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      LucideIcons.bot,
+                      size: 16,
+                      color: AppColors.accentBright,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'OpenHands',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const Spacer(),
+                  _ActionButton(
+                    busy: widget.busy,
+                    canSend: canSend,
+                    onSend: _submit,
+                    onStop: widget.onStop,
+                  ),
+                ],
               ),
             ],
           ),
@@ -130,11 +150,11 @@ class _ActionButton extends StatelessWidget {
   final bool busy;
   final bool canSend;
   final VoidCallback onSend;
-  final VoidCallback onStop;
+  final VoidCallback? onStop;
 
   @override
   Widget build(BuildContext context) {
-    final showStop = busy && !canSend;
+    final showStop = busy && !canSend && onStop != null;
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 180),
       transitionBuilder: (child, animation) =>
@@ -142,7 +162,7 @@ class _ActionButton extends StatelessWidget {
       child: showStop
           ? _RoundButton(
               key: const ValueKey('stop'),
-              icon: AppIcons.stop,
+              icon: LucideIcons.square,
               onTap: onStop,
               background: Theme.of(context).brightness == Brightness.dark
                   ? AppColors.surfaceHigher
@@ -151,7 +171,7 @@ class _ActionButton extends StatelessWidget {
             )
           : _RoundButton(
               key: const ValueKey('send'),
-              icon: AppIcons.send,
+              icon: LucideIcons.arrowUp,
               onTap: canSend ? onSend : null,
               background: canSend
                   ? AppColors.accent

@@ -1,11 +1,11 @@
 import 'package:material_ui/material_ui.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../core/icon_fonts/app_icons.dart';
 import '../core/theme/app_theme.dart';
 
 /// The slim, chrome-free header every pane draws over its content.
 ///
-/// Modelled on Kelivo's mobile app bar: transparent, no elevation, no divider.
+/// A transparent, chrome-free chat header with no elevation or divider.
 /// Content scrolls *under* it and fades out, so the header reads as part of the
 /// canvas instead of a grey bar bolted on top. It is a plain widget rather than
 /// an [AppBar] so the shell can own a single [Scaffold] (and therefore a single
@@ -27,9 +27,8 @@ class PaneHeader extends StatelessWidget {
   final Widget? title;
   final Widget? subtitle;
 
-  /// A small round mark drawn before the title, the way Kelivo's header shows
-  /// the current assistant. It is what makes the bar read as "this
-  /// conversation" rather than a generic toolbar.
+  /// A small round mark drawn before the title, making the bar read as
+  /// "this conversation" rather than a generic toolbar.
   final Widget? avatar;
   final VoidCallback? onMenu;
   final Widget? leading;
@@ -52,7 +51,7 @@ class PaneHeader extends StatelessWidget {
               children: [
                 if (onMenu != null)
                   _HeaderIconButton(
-                    icon: AppIcons.menu,
+                    icon: LucideIcons.menu,
                     tooltip: 'Conversations',
                     onTap: onMenu,
                   )
@@ -121,8 +120,7 @@ class _HeaderWash extends StatelessWidget {
   }
 }
 
-/// A borderless, circular tap target. Kelivo's header buttons carry no ripple
-/// box; they shrink slightly on press instead.
+/// A borderless, circular tap target that shrinks slightly on press.
 class _HeaderIconButton extends StatefulWidget {
   const _HeaderIconButton({
     required this.icon,

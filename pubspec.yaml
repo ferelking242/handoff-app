@@ -46,6 +46,8 @@ dependencies:
   intl: ^0.20.3
   url_launcher: ^6.3.3
   flutter_animate: ^4.5.2
+  flutter_markdown: ^0.7.7
+  lucide_icons_flutter: ^3.1.21
   shimmer: ^4.0.0
 
 dev_dependencies:

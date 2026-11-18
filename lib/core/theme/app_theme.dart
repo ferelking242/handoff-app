@@ -9,16 +9,16 @@ class AppColors {
   const AppColors._();
 
   // Dark (default)
-  static const canvas = Color(0xFF0B0D12);
-  static const surface = Color(0xFF12151C);
-  static const surfaceHigh = Color(0xFF1A1E27);
-  static const surfaceHigher = Color(0xFF222734);
-  static const border = Color(0xFF262B36);
-  static const borderSoft = Color(0xFF1E232D);
+  static const canvas = Color(0xFF191A1F);
+  static const surface = Color(0xFF202127);
+  static const surfaceHigh = Color(0xFF27282E);
+  static const surfaceHigher = Color(0xFF2F3037);
+  static const border = Color(0xFF383A42);
+  static const borderSoft = Color(0xFF2A2B32);
 
-  static const textPrimary = Color(0xFFECEDF1);
-  static const textSecondary = Color(0xFF9BA1AE);
-  static const textTertiary = Color(0xFF6B7280);
+  static const textPrimary = Color(0xFFEBECF0);
+  static const textSecondary = Color(0xFFA4A5AE);
+  static const textTertiary = Color(0xFF777982);
 
   // Light
   static const lightCanvas = Color(0xFFFFFFFF);

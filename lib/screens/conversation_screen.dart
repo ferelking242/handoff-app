@@ -1,8 +1,7 @@
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../core/icon_fonts/app_icons.dart';
 import '../core/theme/app_theme.dart';
 import '../models/conversation.dart';
 import '../providers/app_providers.dart';
@@ -22,14 +21,13 @@ class ConversationScreen extends ConsumerStatefulWidget {
   const ConversationScreen({
     super.key,
     required this.conversation,
-    this.onBack,
+    this.onMenu,
   });
 
   final CloudConversation conversation;
 
-  /// When embedded in the wide layout there is no route to pop, so the shell
-  /// supplies its own back handling.
-  final VoidCallback? onBack;
+  /// Opens the conversation drawer on mobile. Wide layouts use the sidebar.
+  final VoidCallback? onMenu;
 
   @override
   ConsumerState<ConversationScreen> createState() => _ConversationScreenState();
@@ -80,9 +78,8 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
         live.value ?? ref.read(sessionServiceProvider).stateOf(widget.conversation.id);
 
     // The header floats over the transcript rather than sitting above it, so
-    // the messages scroll underneath the soft wash (Kelivo's app bar does the
-    // same). The list gets top padding equal to the header so the first message
-    // still starts clear of it.
+    // messages scroll beneath the transparent header. The list gets top
+    // padding equal to the header so its first event starts below the title.
     return Column(
       children: [
         Expanded(
@@ -106,7 +103,7 @@ class _ConversationScreenState extends ConsumerState<ConversationScreen> {
                 child: _Header(
                   conversation: widget.conversation,
                   state: state,
-                  onBack: widget.onBack,
+                  onMenu: widget.onMenu,
                 ),
               ),
             ],
@@ -134,18 +131,18 @@ class _Header extends StatelessWidget {
   const _Header({
     required this.conversation,
     required this.state,
-    required this.onBack,
+    required this.onMenu,
   });
 
   final CloudConversation conversation;
   final SessionState state;
-  final VoidCallback? onBack;
+  final VoidCallback? onMenu;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return PaneHeader(
-      onMenu: onBack,
+      onMenu: onMenu,
       avatar: _AgentMark(state: state),
       title: Text(
         state.title.isEmpty ? conversation.title : state.title,
@@ -176,9 +173,7 @@ class _Header extends StatelessWidget {
   }
 }
 
-/// The round mark the header shows before the title: the Handoff glyph tinted
-/// by the agent's live state, so the header itself tells you whether the agent
-/// is working without reading the status chip.
+/// The round bot mark before the title, tinted by the agent's live state.
 class _AgentMark extends StatelessWidget {
   const _AgentMark({required this.state});
 
@@ -195,7 +190,7 @@ class _AgentMark extends StatelessWidget {
         shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: Icon(AppIcons.flash, size: 17, color: color),
+      child: Icon(LucideIcons.bot, size: 17, color: color),
     );
   }
 }
@@ -221,7 +216,7 @@ class _Transcript extends StatelessWidget {
       return const Center(child: CircularProgressIndicator(strokeWidth: 2.5));
     }
     if (state.events.isEmpty && state.pending.isEmpty) {
-      return const _EmptyConversation();
+      return const SizedBox.expand();
     }
 
     // The list is reversed so the newest turn sits at the bottom and stays
@@ -231,7 +226,12 @@ class _Transcript extends StatelessWidget {
       for (final message in state.pending.reversed)
         _PendingBubble(message: message, onRetry: onRetry),
       for (final event in state.events.reversed)
-        EventBubble(event: event, animateIn: false),
+        EventBubble(
+          key: ValueKey('event-${event.id}'),
+          event: event,
+          animateIn:
+              state.events.isNotEmpty && event.id == state.events.last.id,
+        ),
       if (loadingOlder) const _OlderSpinner(),
     ];
 
@@ -279,12 +279,19 @@ class _TypingRow extends StatelessWidget {
             ),
             alignment: Alignment.center,
             child: const Icon(
-              AppIcons.flash,
-              size: 15,
+              LucideIcons.bot,
+              size: 16,
               color: AppColors.accentBright,
             ),
           ),
           const SizedBox(width: 12),
+          Text(
+            'Working',
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(width: 8),
           const TypingDots(),
         ],
       ),
@@ -338,7 +345,7 @@ class _PendingBubble extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: failed
                         ? Theme.of(context).colorScheme.errorContainer
-                        : AppColors.accent.withValues(alpha: 0.5),
+                        : AppColors.surfaceHigher,
                     borderRadius: const BorderRadius.only(
                       topLeft: Radius.circular(AppRadius.lg),
                       topRight: Radius.circular(AppRadius.lg),
@@ -372,7 +379,7 @@ class _PendingBubble extends StatelessWidget {
                       const SizedBox(width: 8),
                       TextButton.icon(
                         onPressed: onRetry,
-                        icon: const Icon(AppIcons.refresh, size: 13),
+                        icon: const Icon(LucideIcons.rotateCw, size: 13),
                         label: const Text('Retry'),
                         style: TextButton.styleFrom(
                           visualDensity: VisualDensity.compact,
@@ -387,43 +394,6 @@ class _PendingBubble extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _EmptyConversation extends StatelessWidget {
-  const _EmptyConversation();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: const BoxDecoration(
-                gradient: AppColors.accentGradient,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Icon(AppIcons.flash, size: 26, color: Colors.white),
-            ),
-            const SizedBox(height: 18),
-            Text('Ready when you are', style: theme.textTheme.titleLarge),
-            const SizedBox(height: 8),
-            Text(
-              'Send the first message to kick the agent off.',
-              style: theme.textTheme.bodySmall,
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.05, end: 0),
     );
   }
 }
@@ -444,7 +414,7 @@ class _ErrorBanner extends StatelessWidget {
       child: Row(
         children: [
           Icon(
-            AppIcons.danger,
+            LucideIcons.circleAlert,
             size: 16,
             color: theme.colorScheme.onErrorContainer,
           ),

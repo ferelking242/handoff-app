@@ -1,17 +1,19 @@
 import 'dart:convert';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../core/icon_fonts/app_icons.dart';
 import '../core/theme/app_theme.dart';
 import '../models/conversation_event.dart';
+import 'markdown_content.dart';
 
 /// Renders one event of the transcript.
 ///
-/// Assistant prose is rendered as plain text with generous line height (the
-/// ChatGPT reading experience); tool calls collapse into a compact card the
-/// user can open when they care.
+/// Agent prose is rendered as selectable Markdown; tool events remain compact
+/// until the user expands their details.
 class EventBubble extends StatelessWidget {
   const EventBubble({super.key, required this.event, this.animateIn = true});
 
@@ -23,7 +25,7 @@ class EventBubble extends StatelessWidget {
     final child = _build(context);
     if (child == null) return const SizedBox.shrink();
     final widget = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 4),
       child: child,
     );
     if (!animateIn) return widget;
@@ -35,17 +37,17 @@ class EventBubble extends StatelessWidget {
 
   Widget? _build(BuildContext context) {
     if (event.isUserMessage) {
-      return _UserBubble(text: event.text);
+      return _UserBubble(event: event);
     }
     if (event.isAssistantMessage) {
-      return _AssistantBubble(text: event.text);
+      return _AssistantBubble(event: event);
     }
     if (event.isAction) {
       return _ToolCard(
         title: event.toolName ?? 'Action',
         subtitle: 'Action',
         body: _pretty(event.action),
-        icon: AppIcons.play,
+        icon: LucideIcons.play,
         accent: AppColors.accentBright,
       );
     }
@@ -54,7 +56,7 @@ class EventBubble extends StatelessWidget {
         title: event.toolName ?? 'Result',
         subtitle: 'Result',
         body: _pretty(event.observation),
-        icon: AppIcons.terminal,
+        icon: LucideIcons.terminal,
         accent: AppColors.success,
       );
     }
@@ -63,7 +65,7 @@ class EventBubble extends StatelessWidget {
         title: 'Error',
         subtitle: 'Error',
         body: event.text.isEmpty ? _pretty(event.raw) : event.text,
-        icon: AppIcons.danger,
+        icon: LucideIcons.circleAlert,
         accent: AppColors.danger,
       );
     }
@@ -82,9 +84,9 @@ class EventBubble extends StatelessWidget {
 }
 
 class _UserBubble extends StatelessWidget {
-  const _UserBubble({required this.text});
+  const _UserBubble({required this.event});
 
-  final String text;
+  final ConversationEvent event;
 
   @override
   Widget build(BuildContext context) {
@@ -96,29 +98,22 @@ class _UserBubble extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            gradient: AppColors.accentGradient,
+            color: AppColors.surfaceHigher,
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(AppRadius.lg),
               topRight: Radius.circular(AppRadius.lg),
               bottomLeft: Radius.circular(AppRadius.lg),
-              bottomRight: Radius.circular(AppRadius.xs),
+              bottomRight: Radius.circular(AppRadius.md),
             ),
             border: Border.all(
-              color: Colors.white.withValues(alpha: 0.14),
+              color: theme.colorScheme.outlineVariant,
               width: 0.8,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.22),
-                blurRadius: 20,
-                offset: const Offset(0, 8),
-              ),
-            ],
           ),
           child: SelectableText(
-            text,
+            event.text,
             style: theme.textTheme.bodyMedium?.copyWith(
-              color: Colors.white,
+              color: theme.colorScheme.onSurface,
               height: 1.4,
             ),
           ),
@@ -128,10 +123,22 @@ class _UserBubble extends StatelessWidget {
   }
 }
 
-class _AssistantBubble extends StatelessWidget {
-  const _AssistantBubble({required this.text});
+class _AssistantBubble extends StatefulWidget {
+  const _AssistantBubble({required this.event});
 
-  final String text;
+  final ConversationEvent event;
+
+  @override
+  State<_AssistantBubble> createState() => _AssistantBubbleState();
+}
+
+class _AssistantBubbleState extends State<_AssistantBubble> {
+  bool _copied = false;
+
+  Future<void> _copy() async {
+    await Clipboard.setData(ClipboardData(text: widget.event.text));
+    if (mounted) setState(() => _copied = true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -142,17 +149,56 @@ class _AssistantBubble extends StatelessWidget {
         constraints: const BoxConstraints(maxWidth: 680),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
           children: [
-            _AgentAvatar(),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 2),
-                child: SelectableText(
-                  text,
-                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
-                ),
+            const _AgentAvatar(),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        'OpenHands',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (widget.event.timestamp != null) ...[
+                        const SizedBox(width: 8),
+                        Text(
+                          DateFormat(
+                            'yyyy-MM-dd HH:mm:ss',
+                          ).format(widget.event.timestamp!.toLocal()),
+                          style: theme.textTheme.labelSmall,
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  MarkdownContent(data: widget.event.text),
+                  if (widget.event.text.trim().isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: IconButton(
+                        onPressed: _copy,
+                        tooltip: _copied ? 'Copied' : 'Copy response',
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints.tightFor(
+                          width: 36,
+                          height: 36,
+                        ),
+                        padding: EdgeInsets.zero,
+                        icon: Icon(
+                          _copied ? LucideIcons.check : LucideIcons.copy,
+                          size: 16,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
           ],
@@ -163,6 +209,8 @@ class _AssistantBubble extends StatelessWidget {
 }
 
 class _AgentAvatar extends StatelessWidget {
+  const _AgentAvatar({super.key});
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -170,10 +218,14 @@ class _AgentAvatar extends StatelessWidget {
       height: 28,
       decoration: BoxDecoration(
         color: AppColors.accent.withValues(alpha: 0.16),
-        borderRadius: BorderRadius.circular(9),
+        shape: BoxShape.circle,
       ),
       alignment: Alignment.center,
-      child: const Icon(AppIcons.flash, size: 15, color: AppColors.accentBright),
+      child: const Icon(
+        LucideIcons.bot,
+        size: 16,
+        color: AppColors.accentBright,
+      ),
     );
   }
 }
@@ -269,54 +321,62 @@ class _ToolCardState extends State<_ToolCard> {
                     ),
                     if (widget.body.isNotEmpty)
                       Icon(
-                        _expanded ? AppIcons.arrowUp : AppIcons.arrowDown,
-                        size: 15,
+                        _expanded
+                            ? LucideIcons.chevronUp
+                            : LucideIcons.chevronDown,
+                        size: 16,
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                   ],
                 ),
               ),
             ),
-            if (_expanded)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: theme.colorScheme.surface,
-                        borderRadius: BorderRadius.circular(AppRadius.sm),
-                        border: Border.all(color: border),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeInOut,
+              alignment: Alignment.topCenter,
+              child: _expanded
+                  ? Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.surface,
+                              borderRadius: BorderRadius.circular(AppRadius.sm),
+                              border: Border.all(color: border),
+                            ),
+                            child: SelectableText(
+                              widget.body,
+                              style: const TextStyle(
+                                fontFamily: 'monospace',
+                                fontSize: 11.5,
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: _copy,
+                              icon: Icon(
+                                _copied ? LucideIcons.check : LucideIcons.copy,
+                                size: 14,
+                              ),
+                              label: Text(_copied ? 'Copied' : 'Copy'),
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      child: SelectableText(
-                        widget.body,
-                        style: const TextStyle(
-                          fontFamily: 'monospace',
-                          fontSize: 11.5,
-                          height: 1.4,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Align(
-                      alignment: Alignment.centerRight,
-                      child: TextButton.icon(
-                        onPressed: _copy,
-                        icon: Icon(
-                          _copied ? AppIcons.copySuccess : AppIcons.copy,
-                          size: 14,
-                        ),
-                        label: Text(_copied ? 'Copied' : 'Copy'),
-                        style: TextButton.styleFrom(
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
           ],
         ),
       ),
