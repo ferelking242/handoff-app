@@ -18,8 +18,9 @@ class MarkdownContent extends StatelessWidget {
     final base = MarkdownStyleSheet.fromTheme(
       flutter.ThemeData(
         brightness: theme.brightness,
-        colorScheme: theme.colorScheme,
-        textTheme: theme.textTheme,
+        textTheme: const flutter.TextTheme(
+          bodyMedium: flutter.TextStyle(fontSize: 14),
+        ),
         useMaterial3: true,
       ),
     );
