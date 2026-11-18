@@ -1,39 +1,28 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-
-import 'package:path_provider/path_provider.dart';
 
 import '../models/conversation_event.dart';
 
-/// On-disk event cache, one JSON file per conversation.
+import 'event_cache_store.dart';
+import 'event_cache_store_stub.dart'
+    if (dart.library.io) 'event_cache_store_io.dart'
+    if (dart.library.js_interop) 'event_cache_store_web.dart' as platform;
+
+/// Persistent event cache, one JSON snapshot per conversation.
 ///
 /// The Canvas refetches the newest page over REST every time a conversation
 /// screen mounts, which is what makes the history feel like it "reloads again
 /// and again". Persisting events here lets the UI paint instantly and only ask
 /// the network for what it does not already have.
 class EventCache {
-  EventCache([this._root]);
+  EventCache([Object? root]) : _store = platform.createEventCacheStore(root);
 
-  Directory? _root;
-
-  Future<Directory> _dir() async {
-    final base = _root ??= await getApplicationSupportDirectory();
-    final dir = Directory('${base.path}/events');
-    if (!await dir.exists()) await dir.create(recursive: true);
-    return dir;
-  }
-
-  Future<File> _file(String conversationId) async {
-    final dir = await _dir();
-    return File('${dir.path}/$conversationId.json');
-  }
+  final EventCacheStore _store;
 
   Future<List<ConversationEvent>> load(String conversationId) async {
     try {
-      final file = await _file(conversationId);
-      if (!await file.exists()) return const [];
-      final content = await file.readAsString();
+      final content = await _store.read(conversationId);
+      if (content == null) return const [];
       final decoded = jsonDecode(content);
       if (decoded is! List) return const [];
       return decoded
@@ -50,7 +39,6 @@ class EventCache {
     List<ConversationEvent> events,
   ) async {
     try {
-      final file = await _file(conversationId);
       // Keep the tail bounded so a very long conversation cannot grow without
       // limit on a phone.
       final tail = events.length > 500
@@ -67,7 +55,7 @@ class EventCache {
             },
           )
           .toList();
-      await file.writeAsString(jsonEncode(payload));
+      await _store.write(conversationId, jsonEncode(payload));
     } catch (_) {
       // A cache write failure must never break the live experience.
     }
@@ -75,8 +63,7 @@ class EventCache {
 
   Future<void> clear(String conversationId) async {
     try {
-      final file = await _file(conversationId);
-      if (await file.exists()) await file.delete();
+      await _store.delete(conversationId);
     } catch (_) {}
   }
 }

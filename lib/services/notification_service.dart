@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// Posts user-visible alerts. The seam exists so the session logic can be
@@ -30,6 +31,10 @@ class NotificationService implements AgentNotifier {
 
   Future<void> init() async {
     if (_initialized) return;
+    if (kIsWeb) {
+      _initialized = true;
+      return;
+    }
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
     const settings = InitializationSettings(android: android);
     await _plugin.initialize(settings: settings);
@@ -50,6 +55,7 @@ class NotificationService implements AgentNotifier {
     required String title,
     required String body,
   }) async {
+    if (kIsWeb) return;
     await init();
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
@@ -72,6 +78,7 @@ class NotificationService implements AgentNotifier {
   }
 
   Future<void> cancelFor(String conversationId) async {
+    if (kIsWeb) return;
     await _plugin.cancel(id: conversationId.hashCode & 0x7fffffff);
   }
 }

@@ -1,6 +1,6 @@
 # Handoff
 
-**A fast, native mobile client for [OpenHands Cloud](https://app.all-hands.dev).**
+**A fast Flutter client for [OpenHands Cloud](https://app.all-hands.dev), available on Android and the web.**
 
 OpenHands Cloud runs coding agents in a sandbox and exposes a web UI (Canvas). On a
 phone that UI is awkward, and it has three problems that make it unusable for
@@ -32,9 +32,11 @@ Handoff is a from-scratch Flutter client built around those three fixes.
 
 - Flutter 3.50 or newer (Dart 3.14+)
 - An OpenHands Cloud account
-- Android 7.0 (API 24) or newer on the device
+- Android 7.0 (API 24) or newer for the native app
 
 ## Building
+
+### Android
 
 The released APK targets **ARM64 (`arm64-v8a`) only** for now, so a single file
 installs on essentially every Android phone. Other ABIs (and iOS) come later.
@@ -45,6 +47,22 @@ flutter build apk --release --target-platform android-arm64
 ```
 
 The result is `build/app/outputs/flutter-apk/app-release.apk`.
+
+### Web
+
+Build the browser version locally with:
+
+```bash
+flutter pub get
+flutter build web --release --base-href /handoff-app/
+```
+
+Every push to `main` also builds and publishes the web app to
+[GitHub Pages](https://ferelking242.github.io/handoff-app/). Pull requests build
+the site for verification without publishing it.
+
+The browser version stores its event cache in browser storage. Native Android
+notifications are available in the Android app, but are not enabled on the web.
 
 ### Release signing
 

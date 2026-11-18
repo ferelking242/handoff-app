@@ -1,9 +1,10 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:dio/dio.dart';
 
 import '../config/app_config.dart';
+import 'network_error_matcher_stub.dart'
+    if (dart.library.io) 'network_error_matcher_io.dart' as network_errors;
 
 /// Credentials returned once the user approves a device-flow request.
 class DeviceFlowSession {
@@ -186,7 +187,7 @@ class DeviceFlowService {
     }
     if (error.type == DioExceptionType.unknown) {
       // A SocketException (DNS failure, connection reset) arrives here.
-      return error.error is SocketException || error.error is HttpException;
+      return network_errors.isSocketOrHttpError(error.error);
     }
     return false;
   }

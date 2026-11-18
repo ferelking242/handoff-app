@@ -1,5 +1,8 @@
 name: handoff
-description: Handoff — a fast native Android client for OpenHands Cloud. The agent keeps working when you leave the screen, history is cached, and you get notified when it needs you.
+description: >-
+  Handoff — a fast Flutter client for OpenHands Cloud on Android and web. The
+  agent keeps working when you leave the screen, history is cached, and you
+  get notified when it needs you.
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
