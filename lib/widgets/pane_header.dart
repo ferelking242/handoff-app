@@ -152,7 +152,7 @@ class _MobileHeader extends StatelessWidget {
           ),
           if (title != null || subtitle != null)
             Padding(
-              padding: const EdgeInsets.only(left: 85, right: 4, bottom: 4),
+              padding: const EdgeInsets.only(left: 85, right: 4, bottom: 2),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
