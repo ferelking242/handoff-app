@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../core/icon_fonts/app_icons.dart';
-import '../core/theme/app_theme.dart';
 import '../models/conversation.dart';
 
 /// A compact, horizontally scrollable strip of open chat tabs.

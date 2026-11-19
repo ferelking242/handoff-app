@@ -96,9 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (!_newConversationOpen || _openConversations.isEmpty) return;
     setState(() {
       _newConversationOpen = false;
-      if (_activeConversationId == null) {
-        _activeConversationId = _openConversations.last.id;
-      }
+      _activeConversationId ??= _openConversations.last.id;
     });
   }
 
