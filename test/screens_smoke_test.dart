@@ -7,6 +7,7 @@ import 'package:handoff/screens/conversation_screen.dart';
 import 'package:handoff/screens/home_screen.dart';
 import 'package:handoff/services/notification_service.dart';
 import 'package:handoff/services/session_service.dart';
+import 'package:handoff/widgets/conversation_tabs.dart';
 import 'package:material_ui/material_ui.dart';
 
 /// A notifier that records nothing: the screens must not need the native
@@ -104,5 +105,53 @@ void main() {
     // Wide layout keeps the sidebar visible beside the landing pane.
     expect(find.text('Handoff'), findsWidgets);
     expect(find.text('Search conversations'), findsOneWidget);
+  });
+
+  testWidgets('conversation tabs select, close, and create chats', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(412, 892));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final scrollController = ScrollController();
+    var selectedId = '';
+    var closedId = '';
+    var selectedNew = false;
+    var createdNew = false;
+
+    await tester.pumpWidget(
+      app(
+        ConversationTabs(
+          conversations: [conversation('c1', 'Fix login')],
+          activeConversationId: 'c1',
+          newConversationOpen: true,
+          scrollController: scrollController,
+          onSelectConversation: (item) => selectedId = item.id,
+          onSelectNewConversation: () => selectedNew = true,
+          onCloseConversation: (id) => closedId = id,
+          onCloseNewConversation: () {},
+          onNewConversation: () => createdNew = true,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('New task'));
+    await tester.pump();
+    expect(selectedNew, isTrue);
+
+    await tester.tap(find.text('Fix login'));
+    await tester.pump();
+    expect(selectedId, 'c1');
+
+    await tester.tap(find.byTooltip('Close tab Fix login'));
+    await tester.pump();
+    expect(closedId, 'c1');
+
+    await tester.tap(find.byTooltip('New chat'));
+    await tester.pump();
+    expect(createdNew, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    scrollController.dispose();
   });
 }
