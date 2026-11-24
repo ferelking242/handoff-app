@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../icons/broken_icons.dart';
 import '../../../theme/app_font_weights.dart';
@@ -188,6 +189,25 @@ class _SignInOptions extends StatelessWidget {
                 onSubmitted: (value) =>
                     Navigator.of(dialogContext).pop(value),
               ),
+              const SizedBox(height: 6),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    final uri = Uri.parse(provider.apiKeysUrl);
+                    await launchUrl(
+                      uri,
+                      mode: LaunchMode.externalApplication,
+                    );
+                  },
+                  icon: const Icon(Broken.export, size: 16),
+                  label: const Text('Generate an API key'),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 36),
+                  ),
+                ),
+              ),
             ],
           ),
           actions: [
@@ -324,6 +344,13 @@ class _DeviceCodeCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
+          if (provider.deviceNotice != null) ...[
+            Text(
+              provider.deviceNotice!,
+              style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 6),
+          ],
           TextButton(
             onPressed: provider.cancelDeviceSignIn,
             child: const Text('Cancel'),

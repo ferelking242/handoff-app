@@ -162,7 +162,8 @@ class OpenHandsApi {
     final data = await _postJson(
       _uri('/oauth/device/authorize'),
       const <String, dynamic>{},
-    );
+      headers: const {'Connection': 'close'},
+    ).timeout(const Duration(seconds: 30));
     final code = DeviceCode.fromJson(data);
     if (code.deviceCode.isEmpty || code.userCode.isEmpty) {
       throw OpenHandsApiException(
@@ -177,18 +178,23 @@ class OpenHandsApi {
   /// Returns the access token, or throws [DeviceFlowPending] /
   /// [DeviceFlowSlowDown] while the user has not finished authorizing.
   Future<String> pollDeviceToken(String deviceCode) async {
-    final response = await _client.post(
-      _uri('/oauth/device/token'),
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-        ..._clientHeaders,
-      },
-      body: {
-        'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
-        'device_code': deviceCode,
-      },
-    );
+    final response = await _client
+        .post(
+          _uri('/oauth/device/token'),
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            // The server closes idle keep-alive sockets; reusing one makes
+            // Android fail the poll with "connection abort".
+            'Connection': 'close',
+            ..._clientHeaders,
+          },
+          body: {
+            'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+            'device_code': deviceCode,
+          },
+        )
+        .timeout(const Duration(seconds: 30));
 
     Map<String, dynamic> data = const {};
     final raw = response.body.trim();

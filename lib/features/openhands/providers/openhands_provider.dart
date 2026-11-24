@@ -28,7 +28,12 @@ class OpenHandsProvider extends ChangeNotifier {
   String? _error;
   String? get error => _error;
 
+  String? _deviceNotice;
+  String? get deviceNotice => _deviceNotice;
+
   String get baseUrl => _api.baseUrl;
+
+  String get apiKeysUrl => '$baseUrl/settings/api-keys';
 
   List<OpenHandsConversation> _conversations = const [];
   List<OpenHandsConversation> get conversations => _conversations;
@@ -138,6 +143,7 @@ class OpenHandsProvider extends ChangeNotifier {
     final generation = ++_deviceGeneration;
     _deviceTimer?.cancel();
     _error = null;
+    _deviceNotice = null;
     _deviceCode = null;
     _devicePolling = true;
     _authStatus = OpenHandsAuthStatus.signingIn;
@@ -175,10 +181,19 @@ class OpenHandsProvider extends ChangeNotifier {
         continue;
       } on DeviceFlowSlowDown catch (slowDown) {
         interval = (slowDown.interval ?? (interval + 5)).clamp(1, 30);
+      } on TimeoutException {
+        _deviceNotice = 'The network is slow. Still waiting for approval…';
+        notifyListeners();
+        continue;
+      } on http.ClientException {
+        _deviceNotice = 'Connection interrupted. Still waiting for approval…';
+        notifyListeners();
+        continue;
       } catch (error) {
         if (generation != _deviceGeneration) return;
         _devicePolling = false;
         _deviceCode = null;
+        _deviceNotice = null;
         _authStatus = OpenHandsAuthStatus.signedOut;
         _error = error.toString();
         notifyListeners();
@@ -188,6 +203,7 @@ class OpenHandsProvider extends ChangeNotifier {
     if (generation != _deviceGeneration) return;
     _devicePolling = false;
     _deviceCode = null;
+    _deviceNotice = null;
     _authStatus = OpenHandsAuthStatus.signedOut;
     _error = 'The sign-in code expired. Start again.';
     notifyListeners();
@@ -198,6 +214,7 @@ class OpenHandsProvider extends ChangeNotifier {
     _deviceTimer?.cancel();
     _devicePolling = false;
     _deviceCode = null;
+    _deviceNotice = null;
     _authStatus = OpenHandsAuthStatus.signedOut;
     _error = null;
     notifyListeners();
@@ -213,6 +230,7 @@ class OpenHandsProvider extends ChangeNotifier {
     final key = apiKey.trim();
     if (key.isEmpty) return;
     _error = null;
+    _deviceNotice = null;
     _authStatus = OpenHandsAuthStatus.signingIn;
     notifyListeners();
     _api.token = key;
@@ -237,6 +255,7 @@ class OpenHandsProvider extends ChangeNotifier {
       await _store.writeToken(token);
       _devicePolling = false;
       _deviceCode = null;
+      _deviceNotice = null;
       _authStatus = OpenHandsAuthStatus.signedIn;
       _error = null;
       notifyListeners();
@@ -245,6 +264,7 @@ class OpenHandsProvider extends ChangeNotifier {
       _api.token = null;
       _devicePolling = false;
       _deviceCode = null;
+      _deviceNotice = null;
       _authStatus = OpenHandsAuthStatus.signedOut;
       _error = 'Signed in, but the profile could not be loaded: $error';
       notifyListeners();
@@ -264,6 +284,7 @@ class OpenHandsProvider extends ChangeNotifier {
     _nextPageId = null;
     _active = null;
     _timeline = const [];
+    _deviceNotice = null;
     _authStatus = OpenHandsAuthStatus.signedOut;
     _error = null;
     notifyListeners();
