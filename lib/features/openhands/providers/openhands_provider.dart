@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -160,7 +161,7 @@ class OpenHandsProvider extends ChangeNotifier {
       if (generation != _deviceGeneration) return;
       _devicePolling = false;
       _authStatus = OpenHandsAuthStatus.signedOut;
-      _error = error.toString();
+      _error = _describeError(error);
       notifyListeners();
     }
   }
@@ -195,7 +196,7 @@ class OpenHandsProvider extends ChangeNotifier {
         _deviceCode = null;
         _deviceNotice = null;
         _authStatus = OpenHandsAuthStatus.signedOut;
-        _error = error.toString();
+        _error = _describeError(error);
         notifyListeners();
         return;
       }
@@ -243,7 +244,7 @@ class OpenHandsProvider extends ChangeNotifier {
     } catch (error) {
       _api.token = null;
       _authStatus = OpenHandsAuthStatus.signedOut;
-      _error = error.toString();
+      _error = _describeError(error);
       notifyListeners();
     }
   }
@@ -269,6 +270,23 @@ class OpenHandsProvider extends ChangeNotifier {
       _error = 'Signed in, but the profile could not be loaded: $error';
       notifyListeners();
     }
+  }
+
+  String _describeError(Object error) {
+    if (error is http.ClientException || error is TimeoutException) {
+      return 'Could not reach OpenHands. Check your connection and try again.';
+    }
+    return error.toString();
+  }
+
+  bool _isAuthError(Object error) =>
+      error is OpenHandsApiException &&
+      (error.statusCode == 401 || error.statusCode == 403);
+
+  Future<void> _expireSession() async {
+    await signOut();
+    _error = 'Your OpenHands session expired. Sign in again.';
+    notifyListeners();
   }
 
   Future<void> signOut() async {
@@ -325,7 +343,11 @@ class OpenHandsProvider extends ChangeNotifier {
       _conversations = page.items;
       _nextPageId = page.nextPageId;
     } catch (error) {
-      _conversationsError = error.toString();
+      if (_isAuthError(error)) {
+        await _expireSession();
+        return;
+      }
+      _conversationsError = _describeError(error);
     } finally {
       _conversationsLoading = false;
       notifyListeners();
@@ -343,7 +365,11 @@ class OpenHandsProvider extends ChangeNotifier {
       _conversations = [..._conversations, ...page.items];
       _nextPageId = page.nextPageId;
     } catch (error) {
-      _conversationsError = error.toString();
+      if (_isAuthError(error)) {
+        await _expireSession();
+        return;
+      }
+      _conversationsError = _describeError(error);
     } finally {
       _conversationsLoading = false;
       notifyListeners();
@@ -365,21 +391,55 @@ class OpenHandsProvider extends ChangeNotifier {
 
     final generation = _pollGeneration;
     try {
-      final fresh = await _api.getConversation(conversation.id);
+      var fresh = await _api.getConversation(conversation.id);
       if (generation != _pollGeneration) return;
+      if ((fresh.isPaused || !fresh.canStream) && fresh.canResume) {
+        fresh = await _wakeSandbox(fresh, generation);
+        if (generation != _pollGeneration) return;
+      }
       _active = fresh;
       _replaceInList(fresh);
       await _loadEvents(generation, initial: true);
       _startPolling(generation);
     } catch (error) {
       if (generation != _pollGeneration) return;
-      _timelineError = error.toString();
+      if (_isAuthError(error)) {
+        await _expireSession();
+        return;
+      }
+      _timelineError = _describeError(error);
     } finally {
       if (generation == _pollGeneration) {
         _timelineLoading = false;
         notifyListeners();
       }
     }
+  }
+
+  Future<OpenHandsConversation> _wakeSandbox(
+    OpenHandsConversation conversation,
+    int generation,
+  ) async {
+    final sandboxId = conversation.sandboxId;
+    if (sandboxId == null || sandboxId.isEmpty) return conversation;
+    try {
+      await _api.resumeSandbox(sandboxId);
+    } catch (_) {
+      return conversation;
+    }
+    var latest = conversation;
+    final deadline = DateTime.now().add(const Duration(seconds: 45));
+    while (DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(seconds: 2));
+      if (generation != _pollGeneration) return latest;
+      try {
+        latest = await _api.getConversation(conversation.id);
+      } catch (_) {
+        continue;
+      }
+      if (latest.canStream && !latest.isPaused) return latest;
+    }
+    return latest;
   }
 
   void closeConversation() {
@@ -425,9 +485,26 @@ class OpenHandsProvider extends ChangeNotifier {
   Future<void> _loadEvents(int generation, {bool initial = false}) async {
     final current = _active;
     if (current == null || !current.canStream) {
-      if (initial && current != null && !current.canStream) {
+      if (initial && current != null && current.canResume) {
+        _timelineError = 'Waking the sandbox…';
+        notifyListeners();
+        final woken = await _wakeSandbox(current, generation);
+        if (generation != _pollGeneration) return;
+        _active = woken;
+        _replaceInList(woken);
+        if (woken.canStream) {
+          _timelineError = null;
+          notifyListeners();
+          await _loadEvents(generation, initial: true);
+        } else {
+          _timelineError =
+              'This conversation has no live sandbox yet. Try again in a moment.';
+          notifyListeners();
+        }
+      } else if (initial && current != null) {
         _timelineError =
             'This conversation has no live sandbox. Wake it in OpenHands first.';
+        notifyListeners();
       }
       return;
     }
@@ -466,7 +543,7 @@ class OpenHandsProvider extends ChangeNotifier {
     } catch (error) {
       if (generation != _pollGeneration) return;
       if (initial) {
-        _timelineError = error.toString();
+        _timelineError = _describeError(error);
         notifyListeners();
       }
     } finally {
@@ -522,7 +599,7 @@ class OpenHandsProvider extends ChangeNotifier {
     } catch (error) {
       _timeline =
           _timeline.where((item) => item.id != optimistic.id).toList();
-      _timelineError = error.toString();
+      _timelineError = _describeError(error);
       _sending = false;
       notifyListeners();
       return false;
@@ -537,7 +614,7 @@ class OpenHandsProvider extends ChangeNotifier {
       await _refreshActiveConversation(_pollGeneration);
       await _loadEvents(_pollGeneration, initial: true);
     } catch (error) {
-      _timelineError = error.toString();
+      _timelineError = _describeError(error);
       notifyListeners();
     }
   }
@@ -568,8 +645,12 @@ class OpenHandsProvider extends ChangeNotifier {
       await openConversation(conversation);
       return conversation;
     } catch (error) {
-      _error = error.toString();
       _creating = false;
+      if (_isAuthError(error)) {
+        await _expireSession();
+        return null;
+      }
+      _error = _describeError(error);
       notifyListeners();
       return null;
     }
@@ -629,11 +710,26 @@ class OpenHandsProvider extends ChangeNotifier {
             .timeout(const Duration(seconds: 8));
         watch.stop();
         if (response.statusCode >= 200 && response.statusCode < 400) {
+          final summary = await _guardStatusSummary(base, headers);
+          if (summary == 'unauthorized') {
+            final status = GuardStatus(
+              reachable: false,
+              message: 'Guard is online, but the key is wrong',
+              latency: watch.elapsed,
+              detail: _shorten(response.body),
+            );
+            _guardStatus = status;
+            _guardTesting = false;
+            notifyListeners();
+            return status;
+          }
           final status = GuardStatus(
             reachable: true,
-            message: response.statusCode == 200
-                ? 'Guard is online'
-                : 'Guard answered (HTTP ${response.statusCode})',
+            message: switch (summary) {
+              'missing key' => 'Guard is online · add the Guard key',
+              null => 'Guard is online',
+              _ => 'Guard is online · $summary',
+            },
             latency: watch.elapsed,
             detail: _shorten(response.body),
           );
@@ -665,6 +761,32 @@ class OpenHandsProvider extends ChangeNotifier {
     _guardTesting = false;
     notifyListeners();
     return status;
+  }
+
+  Future<String?> _guardStatusSummary(
+    String base,
+    Map<String, String> headers,
+  ) async {
+    if (!headers.containsKey('Authorization')) return 'missing key';
+    try {
+      final response = await http
+          .get(Uri.parse('$base/v1/status'), headers: headers)
+          .timeout(const Duration(seconds: 8));
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        return 'unauthorized';
+      }
+      if (response.statusCode != 200) return null;
+      final data = jsonDecode(response.body);
+      if (data is! Map) return null;
+      final watching = data['watching'];
+      final active = data['active'];
+      if (watching is num && active is num) {
+        return 'watching $watching · active $active';
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
   }
 
   String _normalizeGuardUrl(String value) {

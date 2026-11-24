@@ -63,6 +63,7 @@ class OpenHandsConversation {
     this.executionStatus,
     this.conversationUrl,
     this.sessionApiKey,
+    this.sandboxId,
     this.uiUrl,
     this.createdAt,
     this.updatedAt,
@@ -78,6 +79,7 @@ class OpenHandsConversation {
   final String? executionStatus;
   final String? conversationUrl;
   final String? sessionApiKey;
+  final String? sandboxId;
   final String? uiUrl;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -85,6 +87,7 @@ class OpenHandsConversation {
 
   bool get isRunning => (executionStatus ?? '').toLowerCase() == 'running';
   bool get isPaused => (sandboxStatus ?? '').toUpperCase() == 'PAUSED';
+  bool get canResume => sandboxId != null && sandboxId!.isNotEmpty;
   bool get canStream => conversationUrl != null && conversationUrl!.isNotEmpty;
 
   String get displayTitle {
@@ -118,6 +121,7 @@ class OpenHandsConversation {
       executionStatus: executionStatus ?? this.executionStatus,
       conversationUrl: conversationUrl ?? this.conversationUrl,
       sessionApiKey: sessionApiKey ?? this.sessionApiKey,
+      sandboxId: sandboxId,
       uiUrl: uiUrl,
       createdAt: createdAt,
       updatedAt: updatedAt,
@@ -142,6 +146,7 @@ class OpenHandsConversation {
       executionStatus: json['execution_status']?.toString(),
       conversationUrl: json['conversation_url']?.toString(),
       sessionApiKey: json['session_api_key']?.toString(),
+      sandboxId: json['sandbox_id']?.toString(),
       uiUrl: json['conversation_ui_url']?.toString(),
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),

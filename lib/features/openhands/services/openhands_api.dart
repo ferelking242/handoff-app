@@ -97,11 +97,30 @@ class OpenHandsApi {
     Uri uri, {
     Map<String, String>? headers,
   }) async {
-    final response = await _client.get(
-      uri,
-      headers: {'Accept': 'application/json', ..._clientHeaders, ...?headers},
-    );
-    return _decode(response);
+    Object? lastError;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        final response = await _client
+            .get(
+              uri,
+              headers: {
+                'Accept': 'application/json',
+                ..._clientHeaders,
+                ...?headers,
+              },
+            )
+            .timeout(const Duration(seconds: 30));
+        return _decode(response);
+      } on http.ClientException catch (error) {
+        lastError = error;
+      } on TimeoutException catch (error) {
+        lastError = error;
+      }
+      if (attempt < 2) {
+        await Future<void>.delayed(Duration(milliseconds: 300 * (attempt + 1)));
+      }
+    }
+    throw lastError!;
   }
 
   Future<Map<String, dynamic>> _postJson(
@@ -178,23 +197,29 @@ class OpenHandsApi {
   /// Returns the access token, or throws [DeviceFlowPending] /
   /// [DeviceFlowSlowDown] while the user has not finished authorizing.
   Future<String> pollDeviceToken(String deviceCode) async {
-    final response = await _client
-        .post(
-          _uri('/oauth/device/token'),
-          headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded',
-            // The server closes idle keep-alive sockets; reusing one makes
-            // Android fail the poll with "connection abort".
-            'Connection': 'close',
-            ..._clientHeaders,
-          },
-          body: {
-            'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
-            'device_code': deviceCode,
-          },
-        )
-        .timeout(const Duration(seconds: 30));
+    // A fresh client per poll avoids reusing an idle socket the server has
+    // already closed; that reuse is what Android reports as a connection abort.
+    final client = http.Client();
+    late final http.Response response;
+    try {
+      response = await client
+          .post(
+            _uri('/oauth/device/token'),
+            headers: {
+              'Accept': 'application/json',
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Connection': 'close',
+              ..._clientHeaders,
+            },
+            body: {
+              'grant_type': 'urn:ietf:params:oauth:grant-type:device_code',
+              'device_code': deviceCode,
+            },
+          )
+          .timeout(const Duration(seconds: 30));
+    } finally {
+      client.close();
+    }
 
     Map<String, dynamic> data = const {};
     final raw = response.body.trim();
@@ -292,6 +317,17 @@ class OpenHandsApi {
       return OpenHandsConversation.fromJson(first.cast<String, dynamic>());
     }
     throw OpenHandsApiException('Unexpected conversation payload.');
+  }
+
+  /// Wakes a paused sandbox. The cloud answers immediately; the sandbox moves
+  /// to RUNNING a few seconds later.
+  Future<void> resumeSandbox(String sandboxId) async {
+    final id = Uri.encodeComponent(sandboxId);
+    await _postJson(
+      _uri('/api/v1/sandboxes/$id/resume'),
+      const <String, dynamic>{},
+      headers: _authHeaders,
+    );
   }
 
   /// Starts a new app conversation and waits for its sandbox to be ready.
