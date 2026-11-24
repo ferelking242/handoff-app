@@ -707,7 +707,7 @@ class OpenHandsProvider extends ChangeNotifier {
       try {
         final response = await http
             .get(Uri.parse(candidate), headers: headers)
-            .timeout(const Duration(seconds: 8));
+            .timeout(const Duration(seconds: 20));
         watch.stop();
         if (response.statusCode >= 200 && response.statusCode < 400) {
           final summary = await _guardStatusSummary(base, headers);
@@ -771,7 +771,7 @@ class OpenHandsProvider extends ChangeNotifier {
     try {
       final response = await http
           .get(Uri.parse('$base/v1/status'), headers: headers)
-          .timeout(const Duration(seconds: 8));
+          .timeout(const Duration(seconds: 20));
       if (response.statusCode == 401 || response.statusCode == 403) {
         return 'unauthorized';
       }
