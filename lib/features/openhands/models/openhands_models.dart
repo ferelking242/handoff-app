@@ -41,7 +41,8 @@ class OpenHandsUser {
       email: (json['email'] ?? '').toString(),
       orgName: (json['org_name'] ?? '').toString(),
       role: (json['role'] ?? '').toString(),
-      permissions: (json['permissions'] as List?)
+      permissions:
+          (json['permissions'] as List?)
               ?.map((e) => e.toString())
               .toList(growable: false) ??
           const <String>[],
@@ -197,6 +198,8 @@ class HandoffTimelineItem {
     this.text = '',
     this.title,
     this.toolName,
+    this.arguments = const {},
+    this.result = '',
     this.running = false,
     this.at,
     this.actionId,
@@ -207,6 +210,8 @@ class HandoffTimelineItem {
   String text;
   String? title;
   String? toolName;
+  Map<String, dynamic> arguments;
+  String result;
   bool running;
   DateTime? at;
   String? actionId;
@@ -330,7 +335,9 @@ String describeAction(Map<String, dynamic> action) {
   if (url is String && url.trim().isNotEmpty) return url;
   if (thought is String && thought.trim().isNotEmpty) return thought.trim();
   if (taskList is List && taskList.isNotEmpty) {
-    final done = taskList.where((e) => e is Map && e['status'] == 'done').length;
+    final done = taskList
+        .where((e) => e is Map && e['status'] == 'done')
+        .length;
     return 'Plan updated · $done/${taskList.length} done';
   }
 

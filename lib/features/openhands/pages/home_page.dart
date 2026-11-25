@@ -4,7 +4,11 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../icons/broken_icons.dart';
+import '../../../shared/animations/widgets.dart';
+import '../../../shared/widgets/ios_tactile.dart';
 import '../../../theme/app_font_weights.dart';
+import '../../chat/widgets/chat_assistant_background.dart';
+import '../../chat/widgets/frosted/chat_frosted_backdrop.dart';
 import '../models/openhands_models.dart';
 import '../providers/openhands_provider.dart';
 import '../widgets/handoff_drawer.dart';
@@ -113,16 +117,16 @@ class _OpenHandsHomePageState extends State<OpenHandsHomePage> {
 
   void _openSettings() {
     _closeDrawer();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const OpenHandsSettingsPage()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const OpenHandsSettingsPage()));
   }
 
   void _openGuard() {
     _closeDrawer();
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const OpenHandsGuardPage()),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const OpenHandsGuardPage()));
   }
 
   void _openAccount() {
@@ -139,121 +143,145 @@ class _OpenHandsHomePageState extends State<OpenHandsHomePage> {
     final status = provider.agentRunning
         ? 'Agent is working'
         : active != null
-            ? 'Idle'
-            : 'OpenHands Cloud';
+        ? 'Idle'
+        : 'OpenHands Cloud';
 
-    return Scaffold(
-      key: _scaffoldKey,
-      drawer: HandoffDrawer(
-        provider: provider,
-        onSelectConversation: _selectConversation,
-        onNewConversation: _newConversation,
-        onOpenSettings: _openSettings,
-        onOpenGuard: _openGuard,
-        onOpenAccount: _openAccount,
-      ),
-      appBar: AppBar(
-        backgroundColor: scheme.surface,
-        surfaceTintColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0.5,
-        leading: IconButton(
-          tooltip: 'Conversations',
-          onPressed: _openDrawer,
-          icon: const Icon(Broken.menu, size: 22),
+    return ChatFrostedBackdrop(
+      backdrop: const ChatAssistantBackground(),
+      child: Scaffold(
+        key: _scaffoldKey,
+        backgroundColor: Colors.transparent,
+        drawer: HandoffDrawer(
+          provider: provider,
+          onSelectConversation: _selectConversation,
+          onNewConversation: _newConversation,
+          onOpenSettings: _openSettings,
+          onOpenGuard: _openGuard,
+          onOpenAccount: _openAccount,
         ),
-        titleSpacing: 0,
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              active?.displayTitle ?? 'Handoff',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: AppFontWeights.semibold,
-                color: scheme.onSurface,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: IosIconButton(
+            icon: Broken.menu,
+            tooltip: 'Conversations',
+            minSize: 44,
+            onTap: _openDrawer,
+          ),
+          titleSpacing: 2,
+          title: Row(
+            children: [
+              const HandoffLogo(size: 30, radius: 9),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    AnimatedTextSwap(
+                      text: active?.displayTitle ?? 'Handoff',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: AppFontWeights.medium,
+                        color: scheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: BoxDecoration(
+                            color: provider.agentRunning
+                                ? scheme.primary
+                                : scheme.onSurface.withValues(alpha: 0.4),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 5),
+                        Flexible(
+                          child: Text(
+                            status,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: scheme.onSurface.withValues(alpha: 0.6),
+                              fontWeight: AppFontWeights.medium,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
+            ],
+          ),
+          actions: [
+            IosIconButton(
+              icon: Broken.shield_tick,
+              tooltip: 'Guard',
+              minSize: 44,
+              onTap: _openGuard,
             ),
-            Row(
-              children: [
-                Container(
-                  width: 6,
-                  height: 6,
-                  decoration: BoxDecoration(
-                    color: provider.agentRunning
-                        ? scheme.primary
-                        : scheme.onSurfaceVariant.withValues(alpha: 0.4),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 5),
-                Text(
-                  status,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+            IosIconButton(
+              icon: Broken.add,
+              tooltip: 'New conversation',
+              minSize: 44,
+              enabled: !provider.creating,
+              onTap: _newConversation,
             ),
+            if (active != null)
+              PopupMenuButton<String>(
+                icon: const Icon(Broken.more, size: 21),
+                onSelected: (value) async {
+                  switch (value) {
+                    case 'refresh':
+                      await provider.refreshTimeline();
+                    case 'web':
+                      final url = active.uiUrl;
+                      if (url != null && url.isNotEmpty) {
+                        await launchUrl(
+                          Uri.parse(url),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      }
+                    case 'close':
+                      provider.closeConversation();
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'refresh', child: Text('Refresh')),
+                  if (active.uiUrl != null)
+                    const PopupMenuItem(
+                      value: 'web',
+                      child: Text('Open in OpenHands'),
+                    ),
+                  const PopupMenuItem(
+                    value: 'close',
+                    child: Text('Close conversation'),
+                  ),
+                ],
+              )
+            else
+              const SizedBox(width: 6),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: 'New conversation',
-            onPressed: provider.creating ? null : _newConversation,
-            icon: const Icon(Broken.add, size: 22),
-          ),
-          if (active != null)
-            PopupMenuButton<String>(
-              icon: const Icon(Broken.more, size: 21),
-              onSelected: (value) async {
-                switch (value) {
-                  case 'refresh':
-                    await provider.refreshTimeline();
-                  case 'web':
-                    final url = active.uiUrl;
-                    if (url != null && url.isNotEmpty) {
-                      await launchUrl(
-                        Uri.parse(url),
-                        mode: LaunchMode.externalApplication,
-                      );
-                    }
-                  case 'close':
-                    provider.closeConversation();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'refresh',
-                  child: Text('Refresh'),
-                ),
-                if (active.uiUrl != null)
-                  const PopupMenuItem(
-                    value: 'web',
-                    child: Text('Open in OpenHands'),
-                  ),
-                const PopupMenuItem(
-                  value: 'close',
-                  child: Text('Close conversation'),
-                ),
-              ],
-            )
-          else
-            const SizedBox(width: 6),
-        ],
+        body: active == null
+            ? _WelcomeView(
+                provider: provider,
+                onNewConversation: _newConversation,
+                onBrowse: _openDrawer,
+                onOpenConversation: _selectConversation,
+              )
+            : OpenHandsConversationView(key: ValueKey(active.id)),
       ),
-      body: active == null
-          ? _WelcomeView(
-              provider: provider,
-              onNewConversation: _newConversation,
-              onBrowse: _openDrawer,
-              onOpenConversation: _selectConversation,
-            )
-          : OpenHandsConversationView(key: ValueKey(active.id)),
     );
   }
 }

@@ -14,8 +14,8 @@ enum OpenHandsAuthStatus { loading, signedOut, signingIn, signedIn, error }
 /// Owns the OpenHands session, the conversation list and the open timeline.
 class OpenHandsProvider extends ChangeNotifier {
   OpenHandsProvider({OpenHandsStore? store, OpenHandsApi? api})
-      : _store = store ?? OpenHandsStore(),
-        _api = api ?? OpenHandsApi();
+    : _store = store ?? OpenHandsStore(),
+      _api = api ?? OpenHandsApi();
 
   final OpenHandsStore _store;
   final OpenHandsApi _api;
@@ -91,8 +91,7 @@ class OpenHandsProvider extends ChangeNotifier {
 
   bool get agentRunning => _active?.isRunning ?? false;
 
-  String? get activeModel =>
-      _active?.llmModel ?? _user?.llmModel;
+  String? get activeModel => _active?.llmModel ?? _user?.llmModel;
 
   Future<void> initialize() async {
     final savedBaseUrl = await _store.readBaseUrl();
@@ -472,8 +471,7 @@ class OpenHandsProvider extends ChangeNotifier {
     try {
       final fresh = await _api.getConversation(current.id);
       if (generation != _pollGeneration) return;
-      final statusChanged =
-          fresh.executionStatus != current.executionStatus;
+      final statusChanged = fresh.executionStatus != current.executionStatus;
       _active = fresh;
       _replaceInList(fresh);
       if (statusChanged) notifyListeners();
@@ -558,8 +556,9 @@ class OpenHandsProvider extends ChangeNotifier {
   }
 
   void _replaceInList(OpenHandsConversation conversation) {
-    final index =
-        _conversations.indexWhere((item) => item.id == conversation.id);
+    final index = _conversations.indexWhere(
+      (item) => item.id == conversation.id,
+    );
     if (index == -1) {
       _conversations = [conversation, ..._conversations];
     } else {
@@ -597,8 +596,7 @@ class OpenHandsProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (error) {
-      _timeline =
-          _timeline.where((item) => item.id != optimistic.id).toList();
+      _timeline = _timeline.where((item) => item.id != optimistic.id).toList();
       _timelineError = _describeError(error);
       _sending = false;
       notifyListeners();
@@ -755,7 +753,8 @@ class OpenHandsProvider extends ChangeNotifier {
       }
     }
 
-    final status = lastStatus ??
+    final status =
+        lastStatus ??
         const GuardStatus(reachable: false, message: 'Could not reach Guard');
     _guardStatus = status;
     _guardTesting = false;
@@ -848,6 +847,7 @@ class OpenHandsProvider extends ChangeNotifier {
             kind: HandoffItemKind.action,
             title: _toolLabel(tool),
             toolName: tool,
+            arguments: action,
             text: detail,
             running: !_instantTool(tool),
             at: event.timestamp,
@@ -863,13 +863,17 @@ class OpenHandsProvider extends ChangeNotifier {
           final text = rawObservation is Map
               ? describeObservation(rawObservation.cast<String, dynamic>())
               : contentToText(rawObservation);
-          final key =
-              event.actionId.isNotEmpty ? event.actionId : event.toolCallId;
+          final key = event.actionId.isNotEmpty
+              ? event.actionId
+              : event.toolCallId;
           final index = actionIndex[key];
           if (index != null && index < items.length) {
             final item = items[index];
             item.running = false;
             if (text.trim().isNotEmpty) {
+              item.result = item.result.trim().isEmpty
+                  ? text.trim()
+                  : '${item.result}\n\n${text.trim()}';
               item.text = item.text.trim().isEmpty
                   ? text.trim()
                   : '${item.text}\n\n${text.trim()}';
@@ -881,6 +885,7 @@ class OpenHandsProvider extends ChangeNotifier {
                 kind: HandoffItemKind.action,
                 title: _toolLabel(event.toolName),
                 toolName: event.toolName,
+                result: text.trim(),
                 text: text.trim(),
                 at: event.timestamp,
               ),
@@ -889,7 +894,8 @@ class OpenHandsProvider extends ChangeNotifier {
         case 'AgentErrorEvent':
         case 'ErrorEvent':
         case 'ConversationErrorEvent':
-          final detail = event.raw['error'] ??
+          final detail =
+              event.raw['error'] ??
               event.raw['detail'] ??
               event.raw['message'] ??
               'The agent hit an error.';
@@ -955,10 +961,7 @@ class OpenHandsProvider extends ChangeNotifier {
     }
   }
 
-  bool _sameTimeline(
-    List<HandoffTimelineItem> a,
-    List<HandoffTimelineItem> b,
-  ) {
+  bool _sameTimeline(List<HandoffTimelineItem> a, List<HandoffTimelineItem> b) {
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {
       if (a[i].id != b[i].id ||
